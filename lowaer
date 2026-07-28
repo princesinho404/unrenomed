@@ -1,9 +1,9 @@
+-- [[ PRINCESINHO MODS // REC v2 - FIXED JUMP HEIGHT + SMART SLOWMOTION ]] --
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local TweenService = game:GetService("TweenService")
-local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
@@ -16,6 +16,7 @@ player.CharacterAdded:Connect(function(newChar)
     rootPart = newChar:WaitForChild("HumanoidRootPart")
 end)
 
+-- VARIÁVEIS DE CONTROLE
 local gravacaoTemporaria = {}
 local listaSalvados = {}
 local posicaoInicial = nil
@@ -26,9 +27,15 @@ local slotAtivo = nil
 local proximoIdSlot = 1
 local guiVisivelGeral = true
 
+-- CONFIGURAÇÕES DE SLOW MOTION E FÍSICA
 local gravarEmSlow = false
 local fatorSlow = 0.3
-local walkSpeedPadrao = 16
+local conexaoSlowDinamic = nil
+local conexaoWalkSpeedWatch = nil
+local conexaoJumpState = nil
+local velocidadeSemSlow = 16
+local jumpPowerOriginal = 50
+local jumpHeightOriginal = 7.2
 
 local NOME_PASTA = "savesbysnooow"
 if makefolder then pcall(function() makefolder(NOME_PASTA) end) end
@@ -188,16 +195,98 @@ ListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     ScrollLista.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 4)
 end)
 
-local function aplicarFisicaSlow(ativo)
-    if ativo then
-        walkSpeedPadrao = humanoid.WalkSpeed > 0 and humanoid.WalkSpeed or 16
-        humanoid.WalkSpeed = walkSpeedPadrao * fatorSlow
-        Workspace.Gravity = 196.2 * (fatorSlow * fatorSlow)
-        
-        if humanoid.UseJumpPower then
-            humanoid.JumpPower = 50 * fatorSlow
+--------------------------------------------------------------------
+-- SISTEMA DE FÍSICA DE SLOW MOTION E PULO CONTROLADO
+--------------------------------------------------------------------
+local function atualizarForcaVectorForce(ativo)
+    if not character then return end
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local vf = root:FindFirstChild("GravidadeVectorForce")
+    
+    if not ativo or not gravando or not gravarEmSlow then
+        if vf then vf.Enabled = false end
+        return
+    end
+
+    if not vf then
+        local attachment = root:FindFirstChild("RootRigAttachment") or Instance.new("Attachment", root)
+        vf = Instance.new("VectorForce")
+        vf.Name = "GravidadeVectorForce"
+        vf.Attachment0 = attachment
+        vf.RelativeTo = Enum.ActuatorRelativeTo.World
+        vf.ApplyAtCenterOfMass = true
+        vf.Parent = root
+    end
+
+    local massaTotal = 0
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            massaTotal = massaTotal + part:GetMass()
         end
-        
+    end
+
+    local gravidadeNormal = workspace.Gravity
+    local gravidadeDesejada = gravidadeNormal * (fatorSlow * fatorSlow)
+    local diferencaGravidade = gravidadeNormal - gravidadeDesejada
+    
+    vf.Force = Vector3.new(0, massaTotal * diferencaGravidade, 0)
+
+    local estado = humanoid:GetState()
+    if estado == Enum.HumanoidStateType.Freefall or estado == Enum.HumanoidStateType.Jumping then
+        vf.Enabled = true
+    else
+        vf.Enabled = false
+    end
+end
+
+local function aplicarFisicaSlow(ativo)
+    if conexaoSlowDinamic then conexaoSlowDinamic:Disconnect() conexaoSlowDinamic = nil end
+    if conexaoWalkSpeedWatch then conexaoWalkSpeedWatch:Disconnect() conexaoWalkSpeedWatch = nil end
+    if conexaoJumpState then conexaoJumpState:Disconnect() conexaoJumpState = nil end
+
+    if ativo then
+        if humanoid then
+            velocidadeSemSlow = humanoid.WalkSpeed
+            jumpPowerOriginal = humanoid.JumpPower
+            jumpHeightOriginal = humanoid.JumpHeight
+
+            -- Ajusta a força do pulo para evitar o pulo gigante com baixa gravidade
+            if humanoid.UseJumpPower then
+                humanoid.JumpPower = jumpPowerOriginal * fatorSlow
+            else
+                humanoid.JumpHeight = jumpHeightOriginal * (fatorSlow * fatorSlow)
+            end
+            
+            -- Detecta mudanças de velocidade (ex: Sprints)
+            conexaoWalkSpeedWatch = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+                local velAtual = humanoid.WalkSpeed
+                if math.abs(velAtual - (velocidadeSemSlow * fatorSlow)) > 0.1 then
+                    velocidadeSemSlow = velAtual
+                end
+            end)
+
+            -- Ajusta o impulso inicial se o jogador pular
+            conexaoJumpState = humanoid.StateChanged:Connect(function(_, novoEstado)
+                if novoEstado == Enum.HumanoidStateType.Jumping and rootPart then
+                    task.defer(function()
+                        if rootPart then
+                            local vel = rootPart.AssemblyLinearVelocity
+                            rootPart.AssemblyLinearVelocity = Vector3.new(vel.X, vel.Y * fatorSlow, vel.Z)
+                        end
+                    end)
+                end
+            end)
+        end
+
+        conexaoSlowDinamic = RunService.PreSimulation:Connect(function()
+            if humanoid and gravando then
+                humanoid.WalkSpeed = velocidadeSemSlow * fatorSlow
+                atualizarForcaVectorForce(true)
+            end
+        end)
+
         pcall(function()
             local animator = humanoid:FindFirstChildOfClass("Animator")
             if animator then
@@ -207,12 +296,14 @@ local function aplicarFisicaSlow(ativo)
             end
         end)
     else
-        humanoid.WalkSpeed = walkSpeedPadrao
-        Workspace.Gravity = 196.2
-        if humanoid.UseJumpPower then
-            humanoid.JumpPower = 50
+        atualizarForcaVectorForce(false)
+
+        if humanoid then
+            humanoid.WalkSpeed = velocidadeSemSlow
+            humanoid.JumpPower = jumpPowerOriginal
+            humanoid.JumpHeight = jumpHeightOriginal
         end
-        
+
         pcall(function()
             local animator = humanoid:FindFirstChildOfClass("Animator")
             if animator then
@@ -224,6 +315,7 @@ local function aplicarFisicaSlow(ativo)
     end
 end
 
+-- MOVER ATÉ O INÍCIO
 local function moverAteInicio(destino, targetCFrame, callback)
     if not rootPart or not humanoid or not character then return end
     local distancia = (rootPart.Position - destino).Magnitude
@@ -270,6 +362,7 @@ local function moverAteInicio(destino, targetCFrame, callback)
     end)
 end
 
+-- LOOP PRINCIPAL DE FÍSICA E ROTAÇÃO
 RunService.PostSimulation:Connect(function(deltaTime)
     if not rootPart or not humanoid then return end
 
@@ -348,6 +441,7 @@ RunService.PostSimulation:Connect(function(deltaTime)
     end
 end)
 
+-- ALTERNAR PLAY / PAUSE
 local function alternarPlaySlot(slotDados)
     if reproduzindo and slotAtivo == slotDados then
         reproduzindo = false
@@ -381,6 +475,7 @@ local function alternarPlaySlot(slotDados)
     end
 end
 
+-- SALVAMENTO
 local function salvarListaEmArquivo()
     task.spawn(function()
         if writefile and HttpService then
@@ -403,6 +498,7 @@ local function salvarListaEmArquivo()
     end)
 end
 
+-- POPUP DE CONFIGURAÇÕES
 local PopupFrame = Instance.new("Frame", MainFrame)
 PopupFrame.Size = UDim2.new(1, -12, 0, 140)
 PopupFrame.Position = UDim2.new(0, 6, 1, -146)
@@ -598,11 +694,13 @@ local function criarItemLista(slotDados)
         PopupFrame.Visible = true
     end)
 end
+
+-- CARREGAR DADOS SALVOS
 task.spawn(function()
     if readfile and isfile and HttpService and isfile(NOME_PASTA .. "/lista_saves.txt") then
         local sucesso, conteudo = pcall(function() return readfile(NOME_PASTA .. "/lista_saves.txt") end)
         if sucesso and conteudo and conteudo ~= "" then
-            local sucessoJson, listaCarregada = pcall(function() return HttpService:JSONEncode(conteudo) end)
+            local sucessoJson, listaCarregada = pcall(function() return HttpService:JSONDecode(conteudo) end)
             if sucessoJson and type(listaCarregada) == "table" then
                 for _, slotInfo in ipairs(listaCarregada) do
                     local kb = nil
@@ -626,6 +724,7 @@ task.spawn(function()
     end
 end)
 
+-- EVENTOS DOS BOTÕES PRINCIPAIS
 BtnGravar.MouseButton1Click:Connect(function()
     if reproduzindo then 
         reproduzindo = false 
@@ -715,11 +814,11 @@ BtnSalvar.MouseButton1Click:Connect(function()
 end)
 
 local BtnToggle = Instance.new("TextButton", sg)
-BtnToggle.Size = UDim2.new(0, 36, 0, 36)
+BtnToggle.Size = UDim2.new(0, 50, 0, 50)
 BtnToggle.Position = UDim2.new(0, 15, 0.5, -18)
 BtnToggle.BackgroundColor3 = Color3.fromRGB(130, 80, 240)
-BtnToggle.Text = "📍"
-BtnToggle.TextSize = 15
+BtnToggle.Text = "HVC"
+BtnToggle.TextSize = 14
 BtnToggle.TextColor3 = Color3.new(1, 1, 1)
 Instance.new("UICorner", BtnToggle).CornerRadius = UDim.new(1, 0)
 
@@ -757,5 +856,3 @@ end
 
 fazerElementoMovel(Header, MainFrame)
 fazerElementoMovel(BtnToggle, BtnToggle)
-
--- [[ PRINCESINHO MODS // REC v2 - BYPASS EB DO APEX ]] --
