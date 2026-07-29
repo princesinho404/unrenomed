@@ -729,34 +729,20 @@ pcall(function()
     criarComandoInvisivel("rec", "esconder")
 end)
 
--- GESTO DE 3 DEDOS NA TELA PARA CELULAR
-UserInputService.TouchStarted:Connect(function(touch, gameProcessed)
+-- SISTEMA DE 3 DEDOS MELHORADO PARA CELULAR
+local UserInputService = game:GetService("UserInputService")
+
+UserInputService.TouchEnded:Connect(function(touch, gameProcessed)
+    -- Se o jogador estiver interagindo com o chat ou botões do jogo, ignora
     if gameProcessed then return end
-    local toquesAtivos = UserInputService:GetTouches()
-    if #toquesAtivos >= 3 then
+    
+    -- Verifica a quantidade de toques que acabaram de acontecer
+    local toques = UserInputService:GetTouches()
+    
+    -- Se havia 3 ou mais dedos na tela ao soltar
+    if #toques >= 2 then -- Lê os toques simultâneos no evento de soltar
         guiVisivelGeral = not guiVisivelGeral
         sg.Enabled = guiVisivelGeral
-    end
-    
-    if escutandoTeclado and slotSelecionadoPopup then
-        if input.UserInputType == Enum.UserInputType.Keyboard then
-            if input.KeyCode == Enum.KeyCode.Escape then
-                slotSelecionadoPopup.dados.keybind = nil
-                BtnKeybind.Text = "Atalho: Nenhum"
-            else
-                slotSelecionadoPopup.dados.keybind = input.KeyCode
-                BtnKeybind.Text = "Atalho: " .. input.KeyCode.Name
-            end
-            escutandoTeclado = false
-            salvarListaEmArquivo()
-        end
-    elseif input.UserInputType == Enum.UserInputType.Keyboard then
-        for _, slot in ipairs(listaSalvados) do
-            if slot.keybind and input.KeyCode == slot.keybind then
-                alternarPlaySlot(slot)
-                break
-            end
-        end
     end
 end)
 
