@@ -729,18 +729,15 @@ pcall(function()
     criarComandoInvisivel("rec", "esconder")
 end)
 
--- SISTEMA DE 3 DEDOS MELHORADO PARA CELULAR
+-- SISTEMA DE TOQUE NA TELA (CELULAR)
 local UserInputService = game:GetService("UserInputService")
 
 UserInputService.TouchEnded:Connect(function(touch, gameProcessed)
-    -- Se o jogador estiver interagindo com o chat ou botões do jogo, ignora
     if gameProcessed then return end
     
-    -- Verifica a quantidade de toques que acabaram de acontecer
     local toques = UserInputService:GetTouches()
     
-    -- Se havia 3 ou mais dedos na tela ao soltar
-    if #toques >= 2 then -- Lê os toques simultâneos no evento de soltar
+    if #toques >= 2 then
         guiVisivelGeral = not guiVisivelGeral
         sg.Enabled = guiVisivelGeral
     end
