@@ -223,7 +223,6 @@ local function desenharRota3D(slotDados, corLinha)
         corLinha = corLinha or Color3.fromRGB(140, 90, 255)
         local posInicio = Vector3.new(slotDados.posicaoStart[1], slotDados.posicaoStart[2], slotDados.posicaoStart[3])
 
-        -- Clone Transparente no Inicio
         if character then
             character.Archivable = true
             local clone = character:Clone()
@@ -253,7 +252,6 @@ local function desenharRota3D(slotDados, corLinha)
             end
         end
 
-        -- Amostragem sem lag
         local totalPontos = #slotDados.dados
         local maxSegumentos = 40
         local passo = math.max(1, math.floor(totalPontos / maxSegumentos))
@@ -266,7 +264,6 @@ local function desenharRota3D(slotDados, corLinha)
         local pUltimo = slotDados.dados[totalPontos]
         table.insert(pontos, posInicio + Vector3.new(pUltimo.offX, pUltimo.offY - 2.8, pUltimo.offZ))
 
-        -- Linhas com Beams
         for i = 1, #pontos - 1 do
             local pA = pontos[i]
             local pB = pontos[i + 1]
@@ -707,42 +704,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- COMANDO INVISÍVEL NO CHAT (/ui, /hide, /rec)
-local TextChatService = game:GetService("TextChatService")
-
-local function criarComandoInvisivel(nome, alias)
-    local cmd = Instance.new("TextChatCommand")
-    cmd.Name = nome
-    cmd.PrimaryAlias = "/" .. nome
-    if alias then cmd.SecondaryAlias = "/" .. alias end
-    cmd.Parent = TextChatService
-    
-    cmd.Triggered:Connect(function()
-        guiVisivelGeral = not guiVisivelGeral
-        sg.Enabled = guiVisivelGeral
-    end)
-end
-
--- Cria os comandos /ui e /hide sem mandar mensagem no chat público
-pcall(function()
-    criarComandoInvisivel("ui", "hide")
-    criarComandoInvisivel("rec", "esconder")
-end)
-
--- SISTEMA DE TOQUE NA TELA (CELULAR)
-local UserInputService = game:GetService("UserInputService")
-
-UserInputService.TouchEnded:Connect(function(touch, gameProcessed)
-    if gameProcessed then return end
-    
-    local toques = UserInputService:GetTouches()
-    
-    if #toques >= 2 then
-        guiVisivelGeral = not guiVisivelGeral
-        sg.Enabled = guiVisivelGeral
-    end
-end)
-
 BtnLoopCheck.MouseButton1Click:Connect(function()
     if slotSelecionadoPopup then
         slotSelecionadoPopup.dados.loopAtivo = not slotSelecionadoPopup.dados.loopAtivo
@@ -998,6 +959,19 @@ BtnToggle.MouseButton1Click:Connect(function()
     if not MainFrame.Visible then fecharPopupConfig() SlowDropdown.Visible = false end
 end)
 
+-- BOTÃO SECRETO INVISÍVEL NO CANTO PARA CELULAR
+local BtnSecreto = Instance.new("TextButton", sg)
+BtnSecreto.Size = UDim2.new(0, 45, 0, 45)
+BtnSecreto.Position = UDim2.new(1, -50, 0, 5)
+BtnSecreto.BackgroundTransparency = 1
+BtnSecreto.Text = ""
+
+BtnSecreto.MouseButton1Click:Connect(function()
+    guiVisivelGeral = not guiVisivelGeral
+    MainFrame.Visible = guiVisivelGeral
+    BtnToggle.Visible = guiVisivelGeral
+end)
+
 local function fazerElementoMovel(instanciaAtivadora, instanciaAlvo)
     local dragging, dragInput, dragStart, startPos
     instanciaAtivadora.InputBegan:Connect(function(input)
@@ -1021,14 +995,16 @@ local function fazerElementoMovel(instanciaAtivadora, instanciaAlvo)
     end)
 end
 
--- COMANDO PARA FECHAR E APAGAR A INTERFACE
+fazerElementoMovel(Header, MainFrame)
+fazerElementoMovel(BtnToggle, BtnToggle)
+
+-- COMANDO PARA FECHAR E APAGAR A INTERFACE TOTALMENTE
 local function fecharInterface()
-    -- Torna a interface invisível e a remove da tela de forma limpa
     sg.Enabled = false
     sg:Destroy()
 end
 
--- Registra o comando /fechar ou /delete no chat
+local TextChatService = game:GetService("TextChatService")
 pcall(function()
     local cmdFechar = Instance.new("TextChatCommand")
     cmdFechar.Name = "fechar"
@@ -1038,6 +1014,3 @@ pcall(function()
     
     cmdFechar.Triggered:Connect(fecharInterface)
 end)
-
-fazerElementoMovel(Header, MainFrame)
-fazerElementoMovel(BtnToggle, BtnToggle)
