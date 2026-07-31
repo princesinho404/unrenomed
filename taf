@@ -1,0 +1,574 @@
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+ 
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+ 
+local Old = PlayerGui:FindFirstChild("ModernArmyUI")
+if Old then
+	Old:Destroy()
+end
+ 
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "ModernArmyUI"
+Gui.ResetOnSpawn = false
+Gui.Parent = PlayerGui
+ 
+------------------------------------------------
+-- BASE DE DADOS DAS DIVISÕES
+------------------------------------------------
+local DivisoesInfo = {
+	["🗡️ BFE"] = {
+		Lema = "Qualquer missão, em qualquer lugar, a qualquer hora, de qualquer maneira.",
+		Botoes = {
+			{Titulo = "Criador", Texto = "MaxTheJp1."},
+			{Titulo = "Criado em", Texto = "1983."},
+			{Titulo = "Comandante", Texto = "Comandante: NATANHMELLO4."},
+			{Titulo = "Subcomandante", Texto = "Subcomandante: RenanFoxiy."},
+			{Titulo = "Comandante e Subcomandante", Texto = "Comandante: NATANHMELLO4.\nSubcomandante: RenanFoxiy."}
+		}
+	},
+	["👮 BPE"] = {
+		Lema = "Orientar o Responsável, Corrigir o Irresponsável, Prender o Incorrigível.",
+		Botoes = {
+			{Titulo = "Comandante", Texto = "Comandante: zCostasz."},
+			{Titulo = "Subcomandante", Texto = "Subcomandante: Matheuslindo587."},
+			{Titulo = "Comandante e Subcomandante", Texto = "Comandante: zCostasz.\nSubcomandante: Matheuslindo587."}
+		}
+	},
+	["☠️ BAC"] = {
+		Lema = "O máximo de confusão, morte e destruição na retaguarda do inimigo.",
+		Botoes = {
+			{Titulo = "Dono", Texto = "MateusHgz."},
+			{Titulo = "Comandante", Texto = "Comandante: GTMITO00."},
+			{Titulo = "Subcomandante", Texto = "Subcomandante: DanielSxS2."},
+			{Titulo = "Comandante e Subcomandante", Texto = "Comandante: GTMITO00.\nSubcomandante: DanielSxS2."}
+		}
+	},
+	["🕵️ CIE"] = {
+		Lema = "Inteligência para Vitória & Saber para Prever.",
+		Botoes = {
+			{Titulo = "Criador", Texto = "Criador: vicofjgfhf"},
+			{Titulo = "Comandante", Texto = "Comandante: eriqurrr."},
+			{Titulo = "Subcomandante", Texto = "Subcomandante: nohanrtop"},
+			{Titulo = "Comandante e Subcomandante", Texto = "Comandante: eriqurrr.\nSubcomandante: nohanrtop."}
+		}
+	},
+	["🐆 CIGS"] = {
+		Pendente = true
+	},
+	["🖥️ CYBER"] = {
+		Lema = "Segurança no ciberespaço, soberania para a Nação.",
+		TamanhoFonteLema = 12,
+		Botoes = {}
+	},
+	["🌵 CAAT"] = {
+		Lema = "O pai cria, a mãe educa e a Caatinga elimina.",
+		Pronome = "Saudações, senhores guardiões de Caatinga.",
+		Botoes = {
+			{Titulo = "Comandante", Texto = "Comandante: SuSujapa976."},
+			{Titulo = "Subcomandante", Texto = "Subcomandante: PATODONOTE."},
+			{Titulo = "Comandante e Subcomandante", Texto = "Comandante: SuSujapa976.\nSubcomandante: PATODONOTE."}
+		}
+	},
+	["🐎 REC-MEC"] = {
+		Lema = "Haverá sempre uma Cavalaria!\nAço na mente, motor no peito e honra na missão!",
+		Pronome = "Saudações, senhor Cavaleiro.",
+		Botoes = {
+			{Titulo = "Comandante", Texto = "Comandante: terro_2433."},
+			{Titulo = "Subcomandante", Texto = "Subcomandante: Contanum5bl"},
+			{Titulo = "Comandante e Subcomandante", Texto = "Comandante: terro_2433.\nSubcomandante: Contanum5bl)"}
+		}
+	}
+}
+
+------------------------------------------------
+-- FUNÇÃO AUXILIAR PARA EFEITO DE HOVER
+------------------------------------------------
+local function CreateHoverEffect(button, stroke, normalColor, hoverColor, clickedColor, normalStrokeColor, hoverStrokeColor)
+	button.MouseEnter:Connect(function()
+		TweenService:Create(button, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = hoverColor}):Play()
+		if stroke and hoverStrokeColor then
+			TweenService:Create(stroke, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Color = hoverStrokeColor}):Play()
+		end
+	end)
+	button.MouseLeave:Connect(function()
+		TweenService:Create(button, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = normalColor}):Play()
+		if stroke and normalStrokeColor then
+			TweenService:Create(stroke, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Color = normalStrokeColor}):Play()
+		end
+	end)
+	button.MouseButton1Down:Connect(function()
+		TweenService:Create(button, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = clickedColor or hoverColor}):Play()
+	end)
+end
+ 
+------------------------------------------------
+-- BOTÃO + (ABRIR PANEL)
+------------------------------------------------
+local OpenButton = Instance.new("TextButton")
+OpenButton.Parent = Gui
+OpenButton.Name = "OpenButton"
+OpenButton.Visible = false
+OpenButton.Size = UDim2.fromOffset(45, 45)
+OpenButton.Position = UDim2.new(0, 20, 0.5, 0)
+OpenButton.Text = "+"
+OpenButton.TextSize = 24
+OpenButton.Font = Enum.Font.GothamBold
+OpenButton.TextColor3 = Color3.new(1,1,1)
+OpenButton.BackgroundColor3 = Color3.fromRGB(32, 120, 75)
+ 
+local OpenCorner = Instance.new("UICorner")
+OpenCorner.CornerRadius = UDim.new(1,0)
+OpenCorner.Parent = OpenButton
+ 
+local OpenStroke = Instance.new("UIStroke")
+OpenStroke.Thickness = 1.5
+OpenStroke.Color = Color3.fromRGB(60, 180, 120)
+OpenStroke.Parent = OpenButton
+ 
+CreateHoverEffect(OpenButton, OpenStroke, Color3.fromRGB(32, 120, 75), Color3.fromRGB(40, 150, 95), Color3.fromRGB(24, 90, 55), Color3.fromRGB(60, 180, 120), Color3.fromRGB(80, 220, 150))
+ 
+------------------------------------------------
+-- JANELA PRINCIPAL (Compacta e Responsiva)
+------------------------------------------------
+local Main = Instance.new("Frame")
+Main.Parent = Gui
+Main.BackgroundColor3 = Color3.fromRGB(24, 26, 32)
+
+-- Configuração Responsiva (Ocupa 75% de largura e 70% da altura da tela no mobile)
+Main.Size = UDim2.new(0.75, 0, 0.7, 0) 
+Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+Main.AnchorPoint = Vector2.new(0.5, 0.5)
+
+-- Limita o tamanho máximo no PC
+local UISizeConstraint = Instance.new("UISizeConstraint")
+UISizeConstraint.MaxSize = Vector2.new(680, 400)
+UISizeConstraint.Parent = Main
+
+local Corner = Instance.new("UICorner")
+Corner.Parent = Main
+Corner.CornerRadius = UDim.new(0, 14)
+ 
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Thickness = 1.5
+MainStroke.Color = Color3.fromRGB(45, 48, 58)
+MainStroke.Parent = Main
+ 
+------------------------------------------------
+-- TOPO (BARRA DE TÍTULO)
+------------------------------------------------
+local Top = Instance.new("Frame")
+Top.Parent = Main
+Top.Size = UDim2.new(1, 0, 0, 45)
+Top.BackgroundTransparency = 1
+ 
+local Title = Instance.new("TextLabel")
+Title.Parent = Top
+Title.Size = UDim2.new(0.6, 0, 1, 0)
+Title.Position = UDim2.fromOffset(15, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Havoc Respostas"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.TextSize = 18
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+ 
+------------------------------------------------
+-- BOTÃO FECHAR
+------------------------------------------------
+local Close = Instance.new("TextButton")
+Close.Parent = Top
+Close.Size = UDim2.fromOffset(30, 30)
+Close.Position = UDim2.new(1, -40, 0.5, -15)
+Close.Text = "X"
+Close.Font = Enum.Font.GothamBold
+Close.TextSize = 13
+Close.TextColor3 = Color3.new(1,1,1)
+Close.BackgroundColor3 = Color3.fromRGB(160, 45, 45)
+ 
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 8)
+CloseCorner.Parent = Close
+ 
+local CloseStroke = Instance.new("UIStroke")
+CloseStroke.Thickness = 1
+CloseStroke.Color = Color3.fromRGB(210, 80, 80)
+CloseStroke.Parent = Close
+ 
+CreateHoverEffect(Close, CloseStroke, Color3.fromRGB(160, 45, 45), Color3.fromRGB(195, 55, 55), Color3.fromRGB(130, 35, 35), Color3.fromRGB(210, 80, 80), Color3.fromRGB(255, 120, 120))
+ 
+------------------------------------------------
+-- BOTÃO MINIMIZAR
+------------------------------------------------
+local Min = Instance.new("TextButton")
+Min.Parent = Top
+Min.Size = UDim2.fromOffset(30, 30)
+Min.Position = UDim2.new(1, -78, 0.5, -15)
+Min.Text = "-"
+Min.Font = Enum.Font.GothamBold
+Min.TextSize = 16
+Min.TextColor3 = Color3.new(1,1,1)
+Min.BackgroundColor3 = Color3.fromRGB(36, 39, 48)
+ 
+local MinCorner = Instance.new("UICorner")
+MinCorner.CornerRadius = UDim.new(0, 8)
+MinCorner.Parent = Min
+ 
+local MinStroke = Instance.new("UIStroke")
+MinStroke.Thickness = 1
+MinStroke.Color = Color3.fromRGB(55, 59, 72)
+MinStroke.Parent = Min
+ 
+CreateHoverEffect(Min, MinStroke, Color3.fromRGB(36, 39, 48), Color3.fromRGB(48, 52, 64), Color3.fromRGB(24, 26, 32), Color3.fromRGB(55, 59, 72), Color3.fromRGB(80, 85, 105))
+ 
+------------------------------------------------
+-- SIDEBAR (Lista Rolável no Mobile para não cortar)
+------------------------------------------------
+local Sidebar = Instance.new("ScrollingFrame")
+Sidebar.Parent = Main
+Sidebar.Position = UDim2.new(0, 12, 0, 55)
+Sidebar.Size = UDim2.new(0.3, 0, 1, -67)
+Sidebar.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
+Sidebar.ScrollBarThickness = 0 -- Oculta barra feia no mobile
+Sidebar.CanvasSize = UDim2.new(0, 0, 0, 0)
+Sidebar.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ 
+local SideCorner = Instance.new("UICorner")
+SideCorner.Parent = Sidebar
+SideCorner.CornerRadius = UDim.new(0, 12)
+ 
+local SideStroke = Instance.new("UIStroke")
+SideStroke.Thickness = 1
+SideStroke.Color = Color3.fromRGB(35, 38, 46)
+SideStroke.Parent = Sidebar
+ 
+local SidePadding = Instance.new("UIPadding")
+SidePadding.PaddingTop = UDim.new(0, 6)
+SidePadding.PaddingBottom = UDim.new(0, 6)
+SidePadding.Parent = Sidebar
+ 
+local List = Instance.new("UIListLayout")
+List.Parent = Sidebar
+List.Padding = UDim.new(0, 5)
+List.HorizontalAlignment = Enum.HorizontalAlignment.Center
+ 
+------------------------------------------------
+-- ÁREA DE CONTEÚDO
+------------------------------------------------
+local Content = Instance.new("Frame")
+Content.Parent = Main
+Content.Position = UDim2.new(0.35, 0, 0, 55)
+Content.Size = UDim2.new(0.65, -24, 1, -67)
+Content.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
+ 
+local ContentCorner = Instance.new("UICorner")
+ContentCorner.Parent = Content
+ContentCorner.CornerRadius = UDim.new(0, 12)
+ 
+local ContentStroke = Instance.new("UIStroke")
+ContentStroke.Thickness = 1
+ContentStroke.Color = Color3.fromRGB(35, 38, 46)
+ContentStroke.Parent = Content
+ 
+local PageTitle = Instance.new("TextLabel")
+PageTitle.Parent = Content
+PageTitle.Position = UDim2.fromOffset(15, 10)
+PageTitle.Size = UDim2.new(1, -30, 0, 30)
+PageTitle.BackgroundTransparency = 1
+PageTitle.Text = "Selecione uma divisão"
+PageTitle.TextColor3 = Color3.new(1,1,1)
+PageTitle.Font = Enum.Font.GothamBold
+PageTitle.TextSize = 18
+PageTitle.TextXAlignment = Enum.TextXAlignment.Left
+ 
+local function ClearContent()
+	for _,v in pairs(Content:GetChildren()) do
+		if v ~= PageTitle and not v:IsA("UIStroke") then
+			v:Destroy()
+		end
+	end
+end
+
+------------------------------------------------
+-- FUNÇÕES GERADORAS COMPACTAS (Usa Layout Automático)
+------------------------------------------------
+local function CriarBotaoGenerico(Parent, Titulo, TextoCopiar, Altura, CorFundo, CorBorda)
+	local Botao = Instance.new("TextButton")
+	Botao.Parent = Parent
+	Botao.Size = UDim2.new(1, -20, 0, Altura)
+	Botao.BackgroundColor3 = CorFundo or Color3.fromRGB(36, 39, 48)
+	Botao.Text = "📋 " .. Titulo
+	Botao.Font = Enum.Font.GothamBold
+	Botao.TextSize = 11
+	Botao.TextColor3 = Color3.new(1,1,1)
+ 
+	local Corner = Instance.new("UICorner")
+	Corner.Parent = Botao
+	Corner.CornerRadius = UDim.new(0, 6)
+ 
+	local Stroke = Instance.new("UIStroke")
+	Stroke.Thickness = 1
+	Stroke.Color = CorBorda or Color3.fromRGB(55, 59, 72)
+	Stroke.Parent = Botao
+ 
+	CreateHoverEffect(Botao, Stroke, Botao.BackgroundColor3, Color3.fromRGB(48, 52, 64), Color3.fromRGB(24, 26, 32), Stroke.Color, Color3.fromRGB(80, 85, 105))
+ 
+	Botao.MouseButton1Click:Connect(function()
+		setclipboard(TextoCopiar)
+		Botao.Text = "✅ Copiado!"
+		task.wait(1)
+		Botao.Text = "📋 " .. Titulo
+	end)
+	return Botao
+end
+
+local function ConstruirPaginaDinamica(Name, Info)
+	PageTitle.Text = Name
+	ClearContent()
+ 
+	-- CARD AGORA É UM SCROLLING FRAME (Nunca mais corta no Celular!)
+	local Card = Instance.new("ScrollingFrame")
+	Card.Parent = Content
+	Card.Position = UDim2.fromOffset(12, 45)
+	Card.Size = UDim2.new(1, -24, 1, -57)
+	Card.BackgroundColor3 = Color3.fromRGB(28, 32, 38)
+	Card.ScrollBarThickness = 3 -- Barra de rolagem sutil nas laterais
+	Card.ScrollBarImageColor3 = Color3.fromRGB(60, 64, 75)
+	Card.CanvasSize = UDim2.new(0, 0, 0, 0)
+	Card.AutomaticCanvasSize = Enum.AutomaticSize.Y -- Cresce automaticamente conforme adiciona botões
+ 
+	local CardCorner = Instance.new("UICorner")
+	CardCorner.Parent = Card
+	CardCorner.CornerRadius = UDim.new(0, 10)
+ 
+	local CardStroke = Instance.new("UIStroke")
+	CardStroke.Thickness = 1
+	CardStroke.Color = Info.Pendente and Color3.fromRGB(255, 200, 0) or Color3.fromRGB(45, 48, 58)
+	CardStroke.Parent = Card
+
+	local Layout = Instance.new("UIListLayout")
+	Layout.Parent = Card
+	Layout.Padding = UDim.new(0, 8)
+	Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	
+	local Padding = Instance.new("UIPadding")
+	Padding.Parent = Card
+	Padding.PaddingTop = UDim.new(0, 12)
+	Padding.PaddingBottom = UDim.new(0, 12)
+
+	if Info.Pendente then
+		local Icone = Instance.new("TextLabel")
+		Icone.Parent = Card
+		Icone.Size = UDim2.new(1, 0, 0, 50)
+		Icone.BackgroundTransparency = 1
+		Icone.Text = "🔄"
+		Icone.Font = Enum.Font.GothamBold
+		Icone.TextSize = 35
+		Icone.TextColor3 = Color3.new(1,1,1)
+ 
+		local Texto = Instance.new("TextLabel")
+		Texto.Parent = Card
+		Texto.Size = UDim2.new(1, -20, 0, 30)
+		Texto.BackgroundTransparency = 1
+		Texto.Text = "PENDENTE"
+		Texto.Font = Enum.Font.GothamBold
+		Texto.TextSize = 20
+		Texto.TextColor3 = Color3.fromRGB(255, 200, 0)
+		return
+	end
+	
+	-- Renderizar Lema
+	if Info.Lema then
+		local LemaContainer = Instance.new("Frame")
+		LemaContainer.Parent = Card
+		LemaContainer.Size = UDim2.new(1, -20, 0, 60)
+		LemaContainer.BackgroundTransparency = 1
+
+		local LemaTitle = Instance.new("TextLabel")
+		LemaTitle.Parent = LemaContainer
+		LemaTitle.Position = UDim2.fromOffset(5, 0)
+		LemaTitle.Size = UDim2.new(1, -120, 0, 20)
+		LemaTitle.BackgroundTransparency = 1
+		LemaTitle.Text = "📜 LEMA"
+		LemaTitle.TextColor3 = Color3.new(1,1,1)
+		LemaTitle.Font = Enum.Font.GothamBold
+		LemaTitle.TextSize = 14
+		LemaTitle.TextXAlignment = Enum.TextXAlignment.Left
+ 
+		local LemaTexto = Instance.new("TextLabel")
+		LemaTexto.Parent = LemaContainer
+		LemaTexto.Position = UDim2.fromOffset(5, 22)
+		LemaTexto.Size = UDim2.new(1, -10, 0, 35)
+		LemaTexto.BackgroundTransparency = 1
+		LemaTexto.TextWrapped = true
+		LemaTexto.Text = Info.Lema
+		LemaTexto.TextColor3 = Color3.fromRGB(180, 185, 195)
+		LemaTexto.Font = Enum.Font.Gotham
+		LemaTexto.TextSize = Info.TamanhoFonteLema or 11
+		LemaTexto.TextXAlignment = Enum.TextXAlignment.Left
+		
+		-- Botão ao lado do título do Lema
+		local CopyLema = Instance.new("TextButton")
+		CopyLema.Parent = LemaContainer
+		CopyLema.Position = UDim2.new(1, -105, 0, -2)
+		CopyLema.Size = UDim2.fromOffset(105, 24)
+		CopyLema.BackgroundColor3 = Color3.fromRGB(45, 110, 240)
+		CopyLema.Text = "📋 Copiar Lema"
+		CopyLema.Font = Enum.Font.GothamBold
+		CopyLema.TextSize = 10
+		CopyLema.TextColor3 = Color3.new(1,1,1)
+
+		local LemaBtnCorner = Instance.new("UICorner")
+		LemaBtnCorner.CornerRadius = UDim.new(0, 5)
+		LemaBtnCorner.Parent = CopyLema
+
+		local LemaBtnStroke = Instance.new("UIStroke")
+		LemaBtnStroke.Thickness = 1
+		LemaBtnStroke.Color = Color3.fromRGB(80, 140, 255)
+		LemaBtnStroke.Parent = CopyLema
+
+		CreateHoverEffect(CopyLema, LemaBtnStroke, Color3.fromRGB(45, 110, 240), Color3.fromRGB(60, 130, 255), Color3.fromRGB(30, 80, 200), Color3.fromRGB(80, 140, 255), Color3.fromRGB(120, 170, 255))
+
+		CopyLema.MouseButton1Click:Connect(function()
+			setclipboard(Info.Lema)
+			CopyLema.Text = "✅ Copiado!"
+			task.wait(1)
+			CopyLema.Text = "📋 Copiar Lema"
+		end)
+	end
+
+	-- Renderizar Pronome
+	if Info.Pronome then
+		local PronomeContainer = Instance.new("Frame")
+		PronomeContainer.Parent = Card
+		PronomeContainer.Size = UDim2.new(1, -20, 0, 45)
+		PronomeContainer.BackgroundTransparency = 1
+
+		local PronomeTitle = Instance.new("TextLabel")
+		PronomeTitle.Parent = PronomeContainer
+		PronomeTitle.Position = UDim2.fromOffset(5, 0)
+		PronomeTitle.Size = UDim2.new(1, -10, 0, 20)
+		PronomeTitle.BackgroundTransparency = 1
+		PronomeTitle.Text = "🗣️ PRONOME"
+		PronomeTitle.TextColor3 = Color3.new(1,1,1)
+		PronomeTitle.Font = Enum.Font.GothamBold
+		PronomeTitle.TextSize = 14
+		PronomeTitle.TextXAlignment = Enum.TextXAlignment.Left
+ 
+		local PronomeTexto = Instance.new("TextLabel")
+		PronomeTexto.Parent = PronomeContainer
+		PronomeTexto.Position = UDim2.fromOffset(5, 20)
+		PronomeTexto.Size = UDim2.new(1, -10, 0, 20)
+		PronomeTexto.BackgroundTransparency = 1
+		PronomeTexto.TextWrapped = true
+		PronomeTexto.Text = Info.Pronome
+		PronomeTexto.TextColor3 = Color3.fromRGB(180, 185, 195)
+		PronomeTexto.Font = Enum.Font.Gotham
+		PronomeTexto.TextSize = 11
+		PronomeTexto.TextXAlignment = Enum.TextXAlignment.Left
+	end
+
+	-- Renderizar Lista de Botões sem cálculo manual de offset vertical
+	if Info.Botoes then
+		for _, DadosBotao in ipairs(Info.Botoes) do
+			local tituloBotao = DadosBotao.Title or DadosBotao.Titulo
+			CriarBotaoGenerico(Card, tituloBotao, DadosBotao.Texto, 24)
+		end
+	end
+end
+
+------------------------------------------------
+-- GERAR ABAS DA SIDEBAR COMPACTAS
+------------------------------------------------
+local ListaAbasOrdenada = {"🗡️ BFE", "👮 BPE", "☠️ BAC", "🕵️ CIE", "🐆 CIGS", "🖥️ CYBER", "🌵 CAAT", "🐎 REC-MEC"}
+
+for _, Name in ipairs(ListaAbasOrdenada) do
+	local Button = Instance.new("TextButton")
+	Button.Parent = Sidebar
+	Button.Size = UDim2.new(1, -12, 0, 34)
+	Button.Text = Name
+	Button.Font = Enum.Font.GothamBold
+	Button.TextSize = 12
+	Button.TextColor3 = Color3.new(1,1,1)
+	Button.BackgroundColor3 = Color3.fromRGB(32, 34, 42)
+ 
+	local ButtonCorner = Instance.new("UICorner")
+	ButtonCorner.Parent = Button
+	ButtonCorner.CornerRadius = UDim.new(0, 8)
+ 
+	local ButtonStroke = Instance.new("UIStroke")
+	ButtonStroke.Thickness = 1
+	ButtonStroke.Color = Color3.fromRGB(45, 48, 58)
+	ButtonStroke.Parent = Button
+ 
+	CreateHoverEffect(Button, ButtonStroke, Color3.fromRGB(32, 34, 42), Color3.fromRGB(45, 48, 58), Color3.fromRGB(24, 26, 32), Color3.fromRGB(45, 48, 58), Color3.fromRGB(65, 70, 85))
+ 
+	Button.MouseButton1Click:Connect(function()
+		local Info = DivisoesInfo[Name]
+		if Info then
+			ConstruirPaginaDinamica(Name, Info)
+		end
+	end)
+end
+ 
+------------------------------------------------
+-- CONTROLADORES E REGRAS DA UI (Fechar, Minimizar, Drag)
+------------------------------------------------
+Close.MouseButton1Click:Connect(function()
+	Gui:Destroy()
+end)
+ 
+Min.MouseButton1Click:Connect(function()
+	Main.Visible = false
+	OpenButton.Visible = true
+end)
+ 
+OpenButton.MouseButton1Click:Connect(function()
+	Main.Visible = true
+	OpenButton.Visible = false
+end)
+ 
+-- Arrastar Janela Principal
+local Dragging, DragStart, StartPos
+Top.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		Dragging = true
+		DragStart = input.Position
+		StartPos = Main.Position
+	end
+end)
+Top.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then Dragging = false end
+end)
+UIS.InputChanged:Connect(function(input)
+	if Dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local Delta = input.Position - DragStart
+		Main.Position = UDim2.new(StartPos.X.Scale, StartPos.X.Offset + Delta.X, StartPos.Y.Scale, StartPos.Y.Offset + Delta.Y)
+	end
+end)
+ 
+-- Arrastar Botão de Abrir (+)
+local DragButton, ButtonStart, ButtonPos
+OpenButton.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		DragButton = true
+		ButtonStart = input.Position
+		ButtonPos = OpenButton.Position
+	end
+end)
+OpenButton.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then DragButton = false end
+end)
+UIS.InputChanged:Connect(function(input)
+	if DragButton and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local Delta = input.Position - ButtonStart
+		OpenButton.Position = UDim2.new(ButtonPos.X.Scale, ButtonPos.X.Offset + Delta.X, ButtonPos.Y.Scale, ButtonPos.Y.Offset + Delta.Y)
+	end
+end)
+ 
+-- Animação de Entrada Inicial
+local TargetSize = Main.Size
+Main.Size = UDim2.fromOffset(0,0)
+TweenService:Create(Main, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = TargetSize}):Play()
