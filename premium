@@ -52,6 +52,13 @@ InfoCard:AddButton("Versão: Premium 1.0.1", function() end)
 InfoCard:AddButton("Desenvolvedor: Princesinho", function() end)
 InfoCard:AddButton("Status: 🟢 Ativo", function() end)
 
+local AppearanceCard = Home_Page:CreateSection("UI Config")
+AppearanceCard:AddToggle("Interface trasparente", false, function(state) 
+    Window:SetTransparency(state and 0.2 or 0) 
+end, {
+    Title = "Trasparencia",
+    Description = "Deixa a interface trasparente"
+})
 -- ========================================== --
 -- 📂 TAB 2: EB DO DELTA
 -- ========================================== --
@@ -413,7 +420,7 @@ JjsCard:AddSlider("Delay", 53, 200, 53, function(val)
 end, { Title = "Atraso entre cliques (ms)" })
 
 -- ========================================== --
--- 🧠 MOTOR LÓGICO 3: AUTO FARM E MISSÕES
+-- 🧠 MOTOR LÓGICO 3: AUTO FARM E MISSÕES (MICRO-TP UNDERGROUND)
 -- ========================================== --
 local farmAtivo = false
 local modoSelecionado = "None"
@@ -422,11 +429,52 @@ local autoMissaoAtivo = false
 local posicaoInicialMissao = nil
 local conexaoCamera = nil
 
+-- Profundidade enquanto aguarda/se aproxima (número negativo = debaixo do chão)
+local OFFSET_Y = -6 
+
 local function configurarPrompt(prompt)
-    if prompt:IsA("ProximityPrompt") then prompt.HoldDuration = 0 end
+    if prompt:IsA("ProximityPrompt") then
+        if prompt.HoldDuration > 0 then prompt.HoldDuration = 0 end
+        prompt.RequiresLineOfSight = false
+        prompt.MaxActivationDistance = 30
+    end
 end
-for _, obj in ipairs(game:GetDescendants()) do configurarPrompt(obj) end
-game.DescendantAdded:Connect(configurarPrompt)
+
+local function zerarVelocidade(hrp)
+    if hrp then
+        hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+    end
+end
+
+-- Função central do Micro-Teleporte:
+-- Fica embaixo -> sobe por milissegundos -> coleta -> volta pra baixo
+local function executarColetaMicroTP(hrp, alvoPos, prompt)
+    if not prompt or not prompt.Enabled then return false end
+    
+    configurarPrompt(prompt)
+    zerarVelocidade(hrp)
+    
+    -- 1. Posiciona debaixo do chão próximo ao item
+    hrp.CFrame = CFrame.new(alvoPos + Vector3.new(0, OFFSET_Y, 0))
+    task.wait(0.05)
+    
+    -- 2. Micro-TP instantâneo para cima da superfície
+    hrp.CFrame = CFrame.new(alvoPos + Vector3.new(0, 2, 0))
+    task.wait(0.04)
+    
+    -- 3. Aciona a coleta no servidor
+    if fireproximityprompt and prompt.Enabled then
+        fireproximityprompt(prompt)
+    end
+    
+    task.wait(0.04)
+    
+    -- 4. Retorna para debaixo do chão
+    hrp.CFrame = CFrame.new(alvoPos + Vector3.new(0, OFFSET_Y, 0))
+    zerarVelocidade(hrp)
+    return true
+end
 
 local function travarCameraCima()
     if conexaoCamera then conexaoCamera:Disconnect() end
@@ -449,40 +497,39 @@ local function temFerramenta(nome)
     if char and bp then
         if char:FindFirstChild(nome) then return true end
         local f = bp:FindFirstChild(nome)
-        if f then 
-            f.Parent = char 
-            task.wait(0.1) 
-            return true 
+        if f then
+            f.Parent = char
+            task.wait(0.1)
+            return true
         end
     end
     return false
 end
 
--- Corrigido com a coordenada exata da Foice (-355, 3, -625)
 local function pegarFoice()
     if temFerramenta("Foice") then return true end
-    
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     
     if hrp then
-        hrp.CFrame = CFrame.new(-355, 3, -625)
-        task.wait(0.6)
+        local posFoice = Vector3.new(-355, 3, -625)
+        hrp.CFrame = CFrame.new(posFoice + Vector3.new(0, 2, 0))
+        task.wait(0.5)
         
         for _, obj in ipairs(workspace:GetDescendants()) do
             if obj:IsA("ProximityPrompt") and obj.Enabled then
                 local partePai = obj.Parent
                 if partePai and partePai:IsA("BasePart") then
-                    if (partePai.Position - Vector3.new(-355, 3, -625)).Magnitude < 10 then
+                    if (partePai.Position - posFoice).Magnitude < 10 then
+                        configurarPrompt(obj)
                         if fireproximityprompt then fireproximityprompt(obj) end
-                        task.wait(0.6)
+                        task.wait(0.5)
                         break
                     end
                 end
             end
         end
     end
-    
     return temFerramenta("Foice")
 end
 
@@ -535,9 +582,8 @@ local function iniciarAutoMissao()
                     local listaTrofeus = obterTrofeusColetaveis()
                     if #listaTrofeus > 0 then
                         local t = listaTrofeus[1]
-                        hrpAtual.CFrame = t.CFrame * CFrame.new(0, 1.5, 0)
-                        task.wait(0.25)
-                        if fireproximityprompt then fireproximityprompt(t:FindFirstChildWhichIsA("ProximityPrompt", true)) end
+                        local prompt = t:FindFirstChildWhichIsA("ProximityPrompt", true)
+                        executarColetaMicroTP(hrpAtual, t.Position, prompt)
                     end
                 elseif metaGrama > 0 and vGrama < metaGrama then
                     executouAcao = true
@@ -549,9 +595,7 @@ local function iniciarAutoMissao()
                             if prompt and prompt.Enabled then
                                 local alvo = grama:IsA("BasePart") and grama or grama:FindFirstChildWhichIsA("BasePart")
                                 if alvo and alvo.Transparency < 0.9 then
-                                    hrpAtual.CFrame = alvo.CFrame * CFrame.new(0, 3, 0)
-                                    task.wait(0.2)
-                                    if prompt.Enabled and fireproximityprompt then fireproximityprompt(prompt) end
+                                    executarColetaMicroTP(hrpAtual, alvo.Position, prompt)
                                     break
                                 end
                             end
@@ -579,86 +623,85 @@ local function iniciarColetaTrofeus()
             local alvo = trofeu:IsA("BasePart") and trofeu or trofeu:FindFirstChildWhichIsA("BasePart")
             local char = LocalPlayer.Character
             if prompt and prompt.Enabled and alvo and char and char:FindFirstChild("HumanoidRootPart") then
-                char.HumanoidRootPart.CFrame = alvo.CFrame * CFrame.new(0, 3, 0)
-                task.wait(0.4)
-                if fireproximityprompt then fireproximityprompt(prompt) end
-                task.wait(0.4)
+                executarColetaMicroTP(char.HumanoidRootPart, alvo.Position, prompt)
+                task.wait(0.2)
             end
         end
         farmTrofeuRunning = false
     end)
 end
 
+local function farmarGrama(hrp)
+    if not pegarFoice() then return false end
+    local gramasPasta = workspace:FindFirstChild("Map") and workspace.Map.Sistemas.Jobs["Cortar Grama"].Gramas
+    if gramasPasta then
+        for _, grama in ipairs(gramasPasta:GetChildren()) do
+            local prompt = grama:FindFirstChildWhichIsA("ProximityPrompt", true)
+            local alvo = grama:IsA("BasePart") and grama or grama:FindFirstChildWhichIsA("BasePart")
+            
+            if alvo and alvo.Transparency < 0.9 and prompt and prompt.Enabled then
+                return executarColetaMicroTP(hrp, alvo.Position, prompt)
+            end
+        end
+    end
+    return false
+end
+
+local function farmarLixo(hrp, char)
+    local jobLixo = workspace:FindFirstChild("Map") and workspace.Map.Sistemas.Jobs["Recolher Lixo"]
+    local lixoPasta = jobLixo and jobLixo:FindFirstChild("Lixos")
+    local lixeirasPasta = jobLixo and jobLixo:FindFirstChild("Lixeiras")
+    
+    local temLixoInventario = (char:FindFirstChild("Lixo") or LocalPlayer.Backpack:FindFirstChild("Lixo"))
+    
+    if temLixoInventario and lixeirasPasta then
+        local lixeiraAlvo = lixeirasPasta:FindFirstChildWhichIsA("BasePart", true)
+        if lixeiraAlvo then
+            temFerramenta("Lixo")
+            local prompt = lixeiraAlvo:FindFirstChildWhichIsA("ProximityPrompt", true)
+            return executarColetaMicroTP(hrp, lixeiraAlvo.Position, prompt)
+        end
+    elseif lixoPasta then
+        for _, lixo in ipairs(lixoPasta:GetChildren()) do
+            if lixo.Name == "Lixo" then
+                local prompt = lixo:FindFirstChildWhichIsA("ProximityPrompt", true)
+                local alvo = lixo:IsA("BasePart") and lixo or lixo:FindFirstChildWhichIsA("BasePart")
+                
+                if alvo and prompt and prompt.Enabled then
+                    return executarColetaMicroTP(hrp, alvo.Position, prompt)
+                end
+            end
+        end
+    end
+    return false
+end
+
 local function iniciarFarmContinuo()
     task.spawn(function()
+        local turnoAmbos = true 
+        
         while farmAtivo do
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             if not hrp then task.wait(0.5) continue end
 
             if modoSelecionado == "Coletar Grama" then
-                if not pegarFoice() then
-                    task.wait(1)
-                    continue
-                end
-
-                local gramasPasta = workspace:FindFirstChild("Map") and workspace.Map.Sistemas.Jobs["Cortar Grama"].Gramas
-                if gramasPasta then
-                    for _, grama in ipairs(gramasPasta:GetChildren()) do
-                        if not farmAtivo or modoSelecionado ~= "Coletar Grama" then break end
-                        
-                        local prompt = grama:FindFirstChildWhichIsA("ProximityPrompt", true)
-                        local alvo = grama:IsA("BasePart") and grama or grama:FindFirstChildWhichIsA("BasePart")
-                        
-                        if alvo and alvo.Transparency < 0.9 and prompt and prompt.Enabled then
-                            hrp.CFrame = alvo.CFrame * CFrame.new(0, 3, 0)
-                            task.wait(1.5)
-                            if prompt.Enabled and fireproximityprompt then 
-                                fireproximityprompt(prompt) 
-                            end
-                        end
-                    end
-                end
+                farmarGrama(hrp)
+                task.wait(0.3)
                 
             elseif modoSelecionado == "Coletar Lixo" then
-                local jobLixo = workspace:FindFirstChild("Map") and workspace.Map.Sistemas.Jobs["Recolher Lixo"]
-                local lixoPasta = jobLixo and jobLixo:FindFirstChild("Lixos")
-                local lixeirasPasta = jobLixo and jobLixo:FindFirstChild("Lixeiras")
+                farmarLixo(hrp, char)
+                task.wait(0.3)
                 
-                local temLixoInventario = (char:FindFirstChild("Lixo") or LocalPlayer.Backpack:FindFirstChild("Lixo"))
-                
-                if temLixoInventario and lixeirasPasta then
-                    local lixeiraAlvo = lixeirasPasta:FindFirstChildWhichIsA("BasePart", true)
-                    if lixeiraAlvo then
-                        temFerramenta("Lixo")
-                        hrp.CFrame = lixeiraAlvo.CFrame * CFrame.new(0, 3, 0)
-                        task.wait(0.5)
-                        local prompt = lixeiraAlvo:FindFirstChildWhichIsA("ProximityPrompt", true)
-                        if prompt and prompt.Enabled and fireproximityprompt then 
-                            fireproximityprompt(prompt) 
-                        end
-                    end
-                elseif lixoPasta then
-                    for _, lixo in ipairs(lixoPasta:GetChildren()) do
-                        if not farmAtivo or modoSelecionado ~= "Coletar Lixo" or temLixoInventario then break end
-                        
-                        if lixo.Name == "Lixo" then
-                            local prompt = lixo:FindFirstChildWhichIsA("ProximityPrompt", true)
-                            local alvo = lixo:IsA("BasePart") and lixo or lixo:FindFirstChildWhichIsA("BasePart")
-                            
-                            if alvo and prompt and prompt.Enabled then
-                                hrp.CFrame = alvo.CFrame * CFrame.new(0, 3, 0)
-                                task.wait(1)
-                                if prompt.Enabled and fireproximityprompt then 
-                                    fireproximityprompt(prompt) 
-                                end
-                                break
-                            end
-                        end
-                    end
+            elseif modoSelecionado == "Ambos (Mesclado)" then
+                if turnoAmbos then
+                    farmarGrama(hrp)
+                else
+                    farmarLixo(hrp, char)
                 end
+                turnoAmbos = not turnoAmbos 
+                task.wait(0.15) 
             end
-            task.wait(0.1)
         end
     end)
 end
@@ -680,17 +723,17 @@ end, { Title = "Faz sua missão atual sozinho" })
 
 AutoFarmCard:AddButton("Coletar Todos os Troféus", function()
     if not farmTrofeuRunning then
-        Library:Notify({ Title = "Troféus", Description = "Coletando troféus...", Duration = 3 })
+        Library:Notify({ Title = "Troféus", Description = "Coletando troféus com Micro-TP...", Duration = 3 })
         iniciarColetaTrofeus()
     else
         Library:Notify({ Title = "Aviso", Description = "Os troféus já estão sendo coletados!", Duration = 3 })
     end
 end)
 
-AutoFarmCard:AddDropdown("Tipo de Coleta", {"Coletar Lixo", "Coletar Grama"}, false, function(selected)
+AutoFarmCard:AddDropdown("Tipo de Coleta", {"Coletar Lixo", "Coletar Grama", "Ambos (Mesclado)"}, false, function(selected)
     modoSelecionado = selected
     if farmAtivo then
-        farmAtivo = false 
+        farmAtivo = false
         task.wait(0.3)
         farmAtivo = true
         iniciarFarmContinuo()
@@ -854,23 +897,6 @@ local pastaVisualizerTemp, pastaVisualizerSelecionada = nil, nil
 local indiceRotaAtual = 1
 local listaDeRotas = {}
 local rotaSelecionada = "Nenhuma"
-
--- Variáveis do Visual
-local Fardas = {
-    ["Nenhuma"] = nil,
-    ["Oficiais"] = {S = "rbxassetid://14825639654", P = "rbxassetid://14825643510"},
-    ["Generais"] = {S = "rbxassetid://278436685", P = "rbxassetid://278437052"},
-    ["Elite"] = {S = "rbxassetid://75117162625698", P = "rbxassetid://132857388083739"}
-}
-local backups = {}
-local inputTargetNick, inputDisplayNick, inputPatente, inputDivisao, inputCharTarget = "", "", "", "N/A", ""
-local selectedColor = Color3.fromRGB(255, 255, 255)
-local usarTag, fardaUsar = true, false
-local fardaSelecionada = "Nenhuma"
-local cargoStatus = "ELITE"
-local deviceIcon = "🖥️"
-local fullBrightConn
-
 --------------------------------------------------------------------
 -- 🧠 FUNÇÕES LÓGICAS DO TAS (ARQUIVOS, FÍSICA E RENDERIZAÇÃO)
 --------------------------------------------------------------------
@@ -1113,6 +1139,42 @@ local TasTab = Window:CreateTab("TAS", false, false)
 local TasRecPage = TasTab:CreatePage("Gravação & Execução")
 
 local TasControls = TasRecPage:CreateSection("Rotas Temporárias")
+local TasConfig = TasRecPage:CreateSection("Configurações do Motor")
+local TasSaved = TasRecPage:CreateSection("Rotas Salvas")
+
+-- ========================================================
+-- PREPARANDO O DROPDOWN E A FUNÇÃO DE ATUALIZAR A UI
+-- ========================================================
+local DropdownRotas = nil
+
+local function atualizarDropdownUI(nomeParaSelecionar)
+    -- Reconstrói a lista de rotas baseada na tabela atual de salvos
+    listaDeRotas = {}
+    for nomeRota, _ in pairs(rotasSalvas) do
+        table.insert(listaDeRotas, nomeRota)
+    end
+    table.sort(listaDeRotas)
+    
+    if #listaDeRotas == 0 then
+        listaDeRotas = {"Nenhuma"}
+    end
+    
+    -- Atualiza o dropdown visualmente se ele já existir
+    if DropdownRotas then
+        pcall(function() DropdownRotas:Refresh(listaDeRotas) end)
+        pcall(function() DropdownRotas:SetValues(listaDeRotas) end)
+        pcall(function() DropdownRotas:SetOptions(listaDeRotas) end)
+        
+        if nomeParaSelecionar then
+            pcall(function() DropdownRotas:Set(nomeParaSelecionar) end)
+            pcall(function() DropdownRotas:SetValue(nomeParaSelecionar) end)
+        end
+    end
+end
+
+-- ========================================================
+-- ROTAS TEMPORÁRIAS
+-- ========================================================
 TasControls:AddToggle("Gravar", false, function(state)
     if state then
         reproduzindo = false
@@ -1160,10 +1222,16 @@ TasControls:AddButton("Salvar Rota", function()
     salvarArquivoRota(nomeFinal, dadosSlot)
     atualizarListaNavegacao(nomeFinal)
     mudarVisualizerSelecionado()
+    
+    -- Atualiza a UI do Dropdown
+    atualizarDropdownUI(nomeFinal)
+    
     Library:Notify({Title = "Sucesso", Description = "Rota salva!", Duration = 3})
 end, { Title = "Salva a rota temporária" })
 
-local TasConfig = TasRecPage:CreateSection("Configurações do Motor")
+-- ========================================================
+-- CONFIGURAÇÕES DO MOTOR
+-- ========================================================
 TasConfig:AddSlider("Velocidade de Gravação", 1, 10, 10, function(val) 
     fatorSlow = val / 10
     gravarEmSlow = (fatorSlow < 1.0)
@@ -1173,12 +1241,13 @@ TasConfig:AddToggle("MoveTo", false, function(state)
     configSecurity = state
 end, { Title = "Ir até o ponto inicial automaticamente" })
 
--- Corrigindo o Dropdown (não pode começar vazio se não quebra em algumas UI libs)
+-- ========================================================
+-- ROTAS SALVAS
+-- ========================================================
 atualizarListaNavegacao()
 local rotasDropdownList = #listaDeRotas > 0 and listaDeRotas or {"Nenhuma"}
 
-local TasSaved = TasRecPage:CreateSection("Rotas Salvas")
-TasSaved:AddDropdown("Selecionar Rota", rotasDropdownList, false, function(selected)
+DropdownRotas = TasSaved:AddDropdown("Selecionar Rota", rotasDropdownList, false, function(selected)
     rotaSelecionada = selected
     mudarVisualizerSelecionado()
 end, { Title = "Gerenciar rota salva" })
@@ -1210,6 +1279,10 @@ TasSaved:AddTextbox("Renomear", "Novo nome...", function(text)
         salvarArquivoRota(text, dadosAntigos)
         atualizarListaNavegacao(text)
         mudarVisualizerSelecionado()
+        
+        -- Atualiza a UI do Dropdown
+        atualizarDropdownUI(text)
+        
         Library:Notify({Title = "TAS", Description = "Renomeada para " .. text, Duration = 3})
     end
 end, { Title = "Renomeia a rota selecionada" })
@@ -1220,10 +1293,17 @@ TasSaved:AddButton("Deletar Rota", function()
         rotasSalvas[rotaSelecionada] = nil
         atualizarListaNavegacao()
         mudarVisualizerSelecionado()
+        
+        -- Atualiza a UI do Dropdown
+        atualizarDropdownUI("Nenhuma")
+        
         Library:Notify({Title = "TAS", Description = "Rota apagada!", Duration = 3})
     end
 end, { Title = "Apaga a rota selecionada" })
 
+--------------------------------------------------------------------
+-- UTILITÁRIOS E VISUAIS
+--------------------------------------------------------------------
 local TasUtilsPage = TasTab:CreatePage("Utilitários & Visuais")
 local TasVisuals = TasUtilsPage:CreateSection("Renderização de Caminho")
 TasVisuals:AddToggle("Desenhar Linha (Tracer)", true, function(state)
