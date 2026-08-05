@@ -1131,7 +1131,6 @@ local function iniciarPlayback(slot)
     task.defer(function() reproduzindo = true end)
     Library:Notify({Title = "TAS", Description = "Reproduzindo Rota!", Duration = 3})
 end
-
 --------------------------------------------------------------------
 -- 🎥 TAB 4: TAS (Rica em Funções)
 --------------------------------------------------------------------
@@ -1148,24 +1147,23 @@ local TasSaved = TasRecPage:CreateSection("Rotas Salvas")
 local DropdownRotas = nil
 
 local function atualizarDropdownUI(nomeParaSelecionar)
-    -- Reconstrói a lista de rotas baseada na tabela atual de salvos
     listaDeRotas = {}
-    for nomeRota, _ in pairs(rotasSalvas) do
-        table.insert(listaDeRotas, nomeRota)
-    end
+    for nomeRota, _ in pairs(rotasSalvas) do table.insert(listaDeRotas, nomeRota) end
     table.sort(listaDeRotas)
+    if #listaDeRotas == 0 then listaDeRotas = {"Nenhuma"} end
     
-    if #listaDeRotas == 0 then
-        listaDeRotas = {"Nenhuma"}
-    end
-    
-    -- Atualiza o dropdown visualmente se ele já existir
+    -- Atualiza diretamente usando o objeto do Dropdown guardado na variável
     if DropdownRotas then
-        pcall(function() DropdownRotas:Refresh(listaDeRotas) end)
-        pcall(function() DropdownRotas:SetValues(listaDeRotas) end)
-        pcall(function() DropdownRotas:SetOptions(listaDeRotas) end)
+        -- Tentamos :Refresh() primeiro, que é o padrão da maioria das UIs
+        local sucesso = pcall(function() DropdownRotas:Refresh(listaDeRotas) end)
         
-        if nomeParaSelecionar then
+        -- Se der erro, tenta :SetOptions() (usado por algumas variações de biblioteca)
+        if not sucesso then
+            pcall(function() DropdownRotas:SetOptions(listaDeRotas) end)
+        end
+        
+        -- Se um nome foi passado (ex: após salvar), seleciona ele na UI
+        if nomeParaSelecionar then 
             pcall(function() DropdownRotas:Set(nomeParaSelecionar) end)
             pcall(function() DropdownRotas:SetValue(nomeParaSelecionar) end)
         end
@@ -1210,10 +1208,15 @@ TasControls:AddButton("Reproduzir / Parar", function()
     end
 end, { Title = "Reproduz a rota temporária" })
 
+TasControls:AddTextbox("Nome da Rota", "Vazio = Automatico", function(texto)
+    nomeCustomizado = texto
+end, { Title = "Dê um nome antes de salvar" })
+
 TasControls:AddButton("Salvar Rota", function()
     if #gravacaoTemporaria == 0 or not posicaoInicial then
         Library:Notify({Title = "Erro", Description = "Nenhuma gravação para salvar!", Duration = 3}); return
     end
+    
     local nomeFinal = (nomeCustomizado == "" or nomeCustomizado == "Vazio = Automatico") and ("Parkour " .. contadorAutomatico) or nomeCustomizado
     if nomeFinal:match("^Parkour ") then contadorAutomatico = contadorAutomatico + 1 end
     
@@ -1247,10 +1250,11 @@ end, { Title = "Ir até o ponto inicial automaticamente" })
 atualizarListaNavegacao()
 local rotasDropdownList = #listaDeRotas > 0 and listaDeRotas or {"Nenhuma"}
 
+-- AQUI ESTAVA O ERRO: Salvei a criação na variável "DropdownRotas"
 DropdownRotas = TasSaved:AddDropdown("Selecionar Rota", rotasDropdownList, false, function(selected)
     rotaSelecionada = selected
     mudarVisualizerSelecionado()
-end, { Title = "Gerenciar rota salva" })
+end, { Title = "Gerenciar rota salva", Flag = "MenuRotasTAS" })
 
 TasSaved:AddButton("Iniciar / Parar", function()
     if reproduzindo then
@@ -1341,7 +1345,6 @@ local fardaSelecionada = "Nenhuma"
 local cargoStatus = "LIGTH" -- Padrão
 local deviceIcon = "🎮" -- Padrão Console
 local fullBrightConn
-
 --------------------------------------------------------------------
 -- 👁️ TAB 5: VISUAL (INTERFACE E LÓGICA)
 --------------------------------------------------------------------
