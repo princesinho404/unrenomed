@@ -808,75 +808,597 @@ AimSec:AddButton("Ativar PC Hub", function()
         Library:Notify({ Title = "Aim Hub", Description = "Recurso ativado com sucesso!", Duration = 3 })
     end)
 end, { Title = "Injetar Script Externo" })
+--------------------------------------------------------------------
+-- ⚙️ SERVIÇOS E VARIÁVEIS BASE (ESSENCIAL PARA NÃO QUEBRAR)
+--------------------------------------------------------------------
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
 
--- ========================================== --
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = newChar:WaitForChild("Humanoid")
+    rootPart = newChar:WaitForChild("HumanoidRootPart")
+end)
+
+local configSecurity = false 
+local NOME_PASTA = "HVC Premium"
+if isfolder and not isfolder(NOME_PASTA) then
+    pcall(function() makefolder(NOME_PASTA) end)
+end
+
+-- Variáveis do TAS
+local gravando, reproduzindo = false, false
+local tempoDecorrido = 0
+local posicaoInicial = nil
+local gravacaoTemporaria = {}
+local rotasSalvas = {} 
+local fatorSlow, gravarEmSlow, loopAtivo, delayInicio = 1.0, false, false, 0
+local mostrarVisualizer, mostrarVisualizerTemp, mostrarVisualizerSelecionada = true, true, true
+local conexaoSlowDinamic, conexaoWalkSpeedWatch = nil, nil
+local velocidadeSemSlow, jumpPowerOriginal, jumpHeightOriginal = 16, 50, 7.2
+local nomeCustomizado = ""
+local contadorAutomatico = 1
+local slotAtivo = nil
+local pastaLinhas = Instance.new("Folder", workspace)
+pastaLinhas.Name = "PrincesinhoPathVisualizers"
+local pastaVisualizerTemp, pastaVisualizerSelecionada = nil, nil
+local indiceRotaAtual = 1
+local listaDeRotas = {}
+local rotaSelecionada = "Nenhuma"
+
+-- Variáveis do Visual
+local Fardas = {
+    ["Nenhuma"] = nil,
+    ["Oficiais"] = {S = "rbxassetid://14825639654", P = "rbxassetid://14825643510"},
+    ["Generais"] = {S = "rbxassetid://278436685", P = "rbxassetid://278437052"},
+    ["Elite"] = {S = "rbxassetid://75117162625698", P = "rbxassetid://132857388083739"}
+}
+local backups = {}
+local inputTargetNick, inputDisplayNick, inputPatente, inputDivisao, inputCharTarget = "", "", "", "N/A", ""
+local selectedColor = Color3.fromRGB(255, 255, 255)
+local usarTag, fardaUsar = true, false
+local fardaSelecionada = "Nenhuma"
+local cargoStatus = "ELITE"
+local deviceIcon = "🖥️"
+local fullBrightConn
+
+--------------------------------------------------------------------
+-- 🧠 FUNÇÕES LÓGICAS DO TAS (ARQUIVOS, FÍSICA E RENDERIZAÇÃO)
+--------------------------------------------------------------------
+local function limparNomeArquivo(nome) return string.gsub(nome, "[%s%p]", "_") end
+
+local function salvarArquivoRota(nomeRota, tabelaDados)
+    if writefile then
+        pcall(function()
+            tabelaDados.nomeRota = nomeRota
+            local json = HttpService:JSONEncode(tabelaDados)
+            writefile(NOME_PASTA .. "/" .. limparNomeArquivo(nomeRota) .. ".json", json)
+        end)
+    end
+end
+
+local function deletarArquivoRota(nomeRota)
+    if delfile and isfile then
+        pcall(function()
+            local caminho = NOME_PASTA .. "/" .. limparNomeArquivo(nomeRota) .. ".json"
+            if isfile(caminho) then delfile(caminho) end
+        end)
+    end
+end
+
+local function carregarArquivosIniciais()
+    rotasSalvas = {}
+    if listfiles and readfile and isfolder and isfolder(NOME_PASTA) then
+        pcall(function()
+            for _, arq in ipairs(listfiles(NOME_PASTA)) do
+                if string.match(arq, "%.json$") then
+                    local ok, conteudo = pcall(function() return readfile(arq) end)
+                    if ok and conteudo then
+                        local okJson, dados = pcall(function() return HttpService:JSONDecode(conteudo) end)
+                        if okJson and dados and dados.dados then
+                            local nomeSalvo = dados.nomeRota or string.gsub(arq, "^.*[/\\]", ""):gsub("%.json$", "")
+                            rotasSalvas[nomeSalvo] = dados
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end
+carregarArquivosIniciais()
+
+local function atualizarListaNavegacao(manterNome)
+    listaDeRotas = {}
+    for nome, _ in pairs(rotasSalvas) do table.insert(listaDeRotas, nome) end
+    table.sort(listaDeRotas)
+    if #listaDeRotas == 0 then table.insert(listaDeRotas, "Nenhuma") end
+    
+    if manterNome and rotasSalvas[manterNome] then
+        for idx, nome in ipairs(listaDeRotas) do
+            if nome == manterNome then indiceRotaAtual = idx break end
+        end
+    else
+        if indiceRotaAtual > #listaDeRotas then indiceRotaAtual = #listaDeRotas elseif indiceRotaAtual < 1 then indiceRotaAtual = 1 end
+    end
+    rotaSelecionada = listaDeRotas[indiceRotaAtual] or "Nenhuma"
+end
+
+local function limparVisualizer(pasta) if pasta then pasta:Destroy() end end
+
+local function desenharRota3D(slotDados, corLinha)
+    if not slotDados or not slotDados.dados or #slotDados.dados < 2 then return nil end
+    local pastaSlot = Instance.new("Folder", pastaLinhas)
+    pastaSlot.Name = "PathVisualizer"
+    corLinha = corLinha or Color3.fromRGB(140, 90, 255)
+    local posInicio = Vector3.new(slotDados.posicaoStart[1], slotDados.posicaoStart[2], slotDados.posicaoStart[3])
+    local offsetPe = (humanoid and humanoid.HipHeight) and (humanoid.HipHeight + (rootPart.Size.Y / 2)) or 3.0
+
+    local pontosRender, ultimoPontoRender = {}, nil
+    for i = 1, #slotDados.dados do
+        local p = slotDados.dados[i]
+        local posAtual = posInicio + Vector3.new(p.offX, p.offY - offsetPe, p.offZ)
+        if not ultimoPontoRender or (ultimoPontoRender - posAtual).Magnitude >= 0.6 or i == #slotDados.dados then
+            table.insert(pontosRender, posAtual)
+            ultimoPontoRender = posAtual
+        end
+    end
+
+    for i = 1, #pontosRender - 1 do
+        local p1, p2 = pontosRender[i], pontosRender[i+1]
+        local distancia = (p1 - p2).Magnitude
+        if distancia > 0.05 then
+            local linha = Instance.new("Part", pastaSlot)
+            linha.Anchored, linha.CanCollide, linha.CanTouch, linha.CanQuery = true, false, false, false
+            linha.Material, linha.Color, linha.Transparency = Enum.Material.Neon, corLinha, 0.3
+            linha.Size = Vector3.new(0.15, 0.15, distancia)
+            linha.CFrame = CFrame.lookAt(p1, p2) * CFrame.new(0, 0, -distancia / 2)
+        end
+    end
+    return pastaSlot
+end
+
+local function mudarVisualizerSelecionado()
+    limparVisualizer(pastaVisualizerSelecionada)
+    pastaVisualizerSelecionada = nil
+    if mostrarVisualizerSelecionada and rotaSelecionada ~= "Nenhuma" and rotasSalvas[rotaSelecionada] then
+        pastaVisualizerSelecionada = desenharRota3D(rotasSalvas[rotaSelecionada], Color3.fromRGB(0, 255, 255))
+    end
+end
+
+local function atualizarVisualizerTemp()
+    limparVisualizer(pastaVisualizerTemp)
+    pastaVisualizerTemp = nil
+    if mostrarVisualizerTemp and #gravacaoTemporaria > 0 and posicaoInicial then
+        pastaVisualizerTemp = desenharRota3D({dados = gravacaoTemporaria, posicaoStart = {posicaoInicial.X, posicaoInicial.Y, posicaoInicial.Z}}, Color3.fromRGB(255, 215, 0))
+    end
+end
+
+local function atualizarForcaVectorForce(ativo)
+    if not character or not rootPart then return end
+    local vf = rootPart:FindFirstChild("GravidadeVectorForce")
+    if not ativo or not gravando or not gravarEmSlow then
+        if vf then vf.Enabled = false; vf:Destroy() end
+        return
+    end
+    if not vf then
+        local att = rootPart:FindFirstChild("RootRigAttachment") or Instance.new("Attachment", rootPart)
+        vf = Instance.new("VectorForce", rootPart)
+        vf.Name, vf.Attachment0, vf.RelativeTo, vf.ApplyAtCenterOfMass = "GravidadeVectorForce", att, Enum.ActuatorRelativeTo.World, true
+    end
+    local massaTotal, gravNormal = rootPart.AssemblyMass, workspace.Gravity
+    vf.Force = Vector3.new(0, massaTotal * (gravNormal - (gravNormal * (fatorSlow * fatorSlow))), 0)
+    vf.Enabled = (humanoid.FloorMaterial == Enum.Material.Air) or (humanoid:GetState() == Enum.HumanoidStateType.Freefall) or (humanoid:GetState() == Enum.HumanoidStateType.Jumping)
+end
+
+local function aplicarFisicaSlow(ativo)
+    if conexaoSlowDinamic then conexaoSlowDinamic:Disconnect() conexaoSlowDinamic = nil end
+    if conexaoWalkSpeedWatch then conexaoWalkSpeedWatch:Disconnect() conexaoWalkSpeedWatch = nil end
+
+    if ativo then
+        if humanoid then
+            velocidadeSemSlow = humanoid.WalkSpeed
+            jumpPowerOriginal = humanoid.JumpPower
+            jumpHeightOriginal = humanoid.JumpHeight
+            if humanoid.UseJumpPower then humanoid.JumpPower = jumpPowerOriginal * fatorSlow else humanoid.JumpHeight = jumpHeightOriginal * (fatorSlow * fatorSlow) end
+            conexaoWalkSpeedWatch = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+                if math.abs(humanoid.WalkSpeed - (velocidadeSemSlow * fatorSlow)) > 0.1 then velocidadeSemSlow = humanoid.WalkSpeed end
+            end)
+        end
+        conexaoSlowDinamic = RunService.PreSimulation:Connect(function()
+            if humanoid and gravando then humanoid.WalkSpeed = velocidadeSemSlow * fatorSlow; atualizarForcaVectorForce(true) end
+        end)
+    else
+        atualizarForcaVectorForce(false)
+        if humanoid then
+            humanoid.WalkSpeed = velocidadeSemSlow
+            if humanoid.UseJumpPower then humanoid.JumpPower = jumpPowerOriginal else humanoid.JumpHeight = jumpHeightOriginal end
+        end
+    end
+end
+
+RunService.PostSimulation:Connect(function(deltaTime)
+    if not rootPart or not humanoid then return end
+    if gravando then
+        local deltaReal = gravarEmSlow and (deltaTime * fatorSlow) or deltaTime
+        tempoDecorrido = tempoDecorrido + deltaReal
+        local _, y, _ = rootPart.CFrame:ToEulerAnglesYXZ()
+        local multVel = gravarEmSlow and (1 / fatorSlow) or 1.0
+        table.insert(gravacaoTemporaria, {
+            tempo = tempoDecorrido, velX = rootPart.AssemblyLinearVelocity.X * multVel,
+            velY = rootPart.AssemblyLinearVelocity.Y * multVel, velZ = rootPart.AssemblyLinearVelocity.Z * multVel,
+            estado = humanoid:GetState().Name, rotY = y,
+            offX = rootPart.Position.X - posicaoInicial.X, offY = rootPart.Position.Y - posicaoInicial.Y, offZ = rootPart.Position.Z - posicaoInicial.Z
+        })
+    elseif reproduzindo and slotAtivo then
+        tempoDecorrido = tempoDecorrido + deltaTime
+        local historico = slotAtivo.dados
+        local dadosAlvo = historico[1] 
+        for i = #historico, 1, -1 do
+            if historico[i].tempo <= tempoDecorrido then dadosAlvo = historico[i] break end
+        end
+        local tempoFinal = slotAtivo.tempoTotal or historico[#historico].tempo
+        if tempoDecorrido >= tempoFinal then
+            if loopAtivo then
+                tempoDecorrido = 0
+                rootPart.AssemblyLinearVelocity, rootPart.AssemblyAngularVelocity = Vector3.zero, Vector3.zero
+                local pIni = historico[1]
+                character:PivotTo(CFrame.new(slotAtivo.posicaoStart[1] + pIni.offX, slotAtivo.posicaoStart[2] + pIni.offY, slotAtivo.posicaoStart[3] + pIni.offZ) * CFrame.fromEulerAnglesYXZ(0, pIni.rotY, 0))
+            else
+                reproduzindo, slotAtivo = false, nil
+                humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+                pcall(function() Library:Notify({Title = "TAS", Description = "Reprodução Concluída!", Duration = 3}) end)
+            end
+        else
+            rootPart.AssemblyLinearVelocity = Vector3.new(dadosAlvo.velX, dadosAlvo.velY, dadosAlvo.velZ)
+            rootPart.AssemblyAngularVelocity = Vector3.zero
+            rootPart.CFrame = CFrame.new(slotAtivo.posicaoStart[1] + dadosAlvo.offX, slotAtivo.posicaoStart[2] + dadosAlvo.offY, slotAtivo.posicaoStart[3] + dadosAlvo.offZ) * CFrame.fromEulerAnglesYXZ(0, dadosAlvo.rotY, 0)
+            pcall(function()
+                if dadosAlvo.estado then
+                    local stEnum = Enum.HumanoidStateType[dadosAlvo.estado]
+                    if stEnum and humanoid:GetState() ~= stEnum then humanoid:ChangeState(stEnum) end
+                end
+            end)
+        end
+    end
+end)
+
+local function iniciarPlayback(slot)
+    if not slot or not slot.dados or #slot.dados == 0 then
+        Library:Notify({Title = "Erro", Description = "Sem dados na rota!", Duration = 3}); return 
+    end
+    reproduzindo = false; task.wait(0.05)
+    slotAtivo = slot; tempoDecorrido = 0
+    local pStart, pPrimeiro = slot.posicaoStart, slot.dados[1]
+    local posAlvoExata = Vector3.new(pStart[1] + pPrimeiro.offX, pStart[2] + pPrimeiro.offY, pStart[3] + pPrimeiro.offZ)
+    local targetCF = CFrame.new(posAlvoExata) * CFrame.fromEulerAnglesYXZ(0, pPrimeiro.rotY, 0)
+    local dist = (rootPart.Position - posAlvoExata).Magnitude
+
+    if configSecurity and dist > 50 then
+        Library:Notify({Title = "Segurança", Description = "Muito longe. Cancelado!", Duration = 3}); slotAtivo = nil; return
+    end
+
+    local velAtual = humanoid.WalkSpeed; humanoid.WalkSpeed = 16
+    if dist > 1.2 and dist < 35 then
+        humanoid:MoveTo(posAlvoExata - Vector3.new(0, (humanoid and humanoid.HipHeight) and (humanoid.HipHeight + (rootPart.Size.Y / 2)) or 3.0, 0))
+        local t0 = os.clock()
+        while (Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z) - Vector3.new(posAlvoExata.X, 0, posAlvoExata.Z)).Magnitude > 1.2 and (os.clock() - t0) < 2.5 do task.wait() end
+        humanoid:MoveTo(rootPart.Position)
+        rootPart.AssemblyLinearVelocity, rootPart.AssemblyAngularVelocity, humanoid.AutoRotate = Vector3.zero, Vector3.zero, false
+        TweenService:Create(rootPart, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = targetCF}):Play()
+        task.wait(0.2); humanoid.AutoRotate = true
+    else
+        character:PivotTo(targetCF)
+    end
+    humanoid.WalkSpeed = velAtual
+    rootPart.AssemblyLinearVelocity, rootPart.AssemblyAngularVelocity = Vector3.zero, Vector3.zero
+
+    if delayInicio > 0 then task.wait(delayInicio) end
+    task.defer(function() reproduzindo = true end)
+    Library:Notify({Title = "TAS", Description = "Reproduzindo Rota!", Duration = 3})
+end
+
+--------------------------------------------------------------------
 -- 🎥 TAB 4: TAS (Rica em Funções)
--- ========================================== --
+--------------------------------------------------------------------
 local TasTab = Window:CreateTab("TAS", false, false)
-
--- Sub-aba: Gravação e Controles
 local TasRecPage = TasTab:CreatePage("Gravação & Execução")
 
 local TasControls = TasRecPage:CreateSection("Rotas Temporárias")
-TasControls:AddToggle("Gravar", false, function(state) end, { Title = "Gravar rota temporária" })
-TasControls:AddToggle("Mostrar Rota", false, function(state) end, { Title = "Exibe a rota da rota temporária" })
-TasControls:AddButton("Reproduzir / Parar", function() end, { Title = "Reproduz a rota temporária" })
-TasControls:AddButton("Salvar Rota", function() end, { Title = "Salva a rota temporária" })
+TasControls:AddToggle("Gravar", false, function(state)
+    if state then
+        reproduzindo = false
+        gravacaoTemporaria = {}
+        posicaoInicial = rootPart.Position
+        tempoDecorrido = 0
+        gravando = true
+        limparVisualizer(pastaVisualizerTemp)
+        if gravarEmSlow then aplicarFisicaSlow(true) end
+        Library:Notify({Title = "TAS", Description = "Gravação Iniciada!", Duration = 3})
+    else
+        gravando = false
+        aplicarFisicaSlow(false)
+        atualizarVisualizerTemp()
+        Library:Notify({Title = "TAS", Description = "Gravação Parada!", Duration = 3})
+    end
+end, { Title = "Gravar rota temporária" })
+
+TasControls:AddToggle("Mostrar Rota", true, function(state)
+    mostrarVisualizerTemp = state
+    atualizarVisualizerTemp()
+end, { Title = "Exibe a rota da rota temporária" })
+
+TasControls:AddButton("Reproduzir / Parar", function()
+    if reproduzindo then
+        reproduzindo, slotAtivo = false, nil
+        Library:Notify({Title = "TAS", Description = "Reprodução Parada!", Duration = 3})
+    else
+        if #gravacaoTemporaria == 0 or not posicaoInicial then
+            Library:Notify({Title = "Erro", Description = "Nenhuma gravação temporária!", Duration = 3}); return
+        end
+        iniciarPlayback({dados = gravacaoTemporaria, posicaoStart = {posicaoInicial.X, posicaoInicial.Y, posicaoInicial.Z}, tempoTotal = tempoDecorrido})
+    end
+end, { Title = "Reproduz a rota temporária" })
+
+TasControls:AddButton("Salvar Rota", function()
+    if #gravacaoTemporaria == 0 or not posicaoInicial then
+        Library:Notify({Title = "Erro", Description = "Nenhuma gravação para salvar!", Duration = 3}); return
+    end
+    local nomeFinal = (nomeCustomizado == "" or nomeCustomizado == "Vazio = Automatico") and ("Parkour " .. contadorAutomatico) or nomeCustomizado
+    if nomeFinal:match("^Parkour ") then contadorAutomatico = contadorAutomatico + 1 end
+    
+    local dadosSlot = {dados = HttpService:JSONDecode(HttpService:JSONEncode(gravacaoTemporaria)), posicaoStart = {posicaoInicial.X, posicaoInicial.Y, posicaoInicial.Z}, tempoTotal = tempoDecorrido}
+    rotasSalvas[nomeFinal] = dadosSlot
+    salvarArquivoRota(nomeFinal, dadosSlot)
+    atualizarListaNavegacao(nomeFinal)
+    mudarVisualizerSelecionado()
+    Library:Notify({Title = "Sucesso", Description = "Rota salva!", Duration = 3})
+end, { Title = "Salva a rota temporária" })
 
 local TasConfig = TasRecPage:CreateSection("Configurações do Motor")
--- Slider ajustado de 1 a 10 para simular de 0.1 a 1.0 (Menos é câmera lenta)
 TasConfig:AddSlider("Velocidade de Gravação", 1, 10, 10, function(val) 
-    local velFinal = val / 10 -- Converte pra 0.1 a 1.0
+    fatorSlow = val / 10
+    gravarEmSlow = (fatorSlow < 1.0)
 end, { Title = "Velocidade (0.1 a 1.0)" })
-TasConfig:AddToggle("MoveTo", false, function(state) end, { Title = "Ir até o ponto inicial automaticamente", Description = "Se desativado, você precisa andar até a posição inicial no mapa." })
+
+TasConfig:AddToggle("MoveTo", false, function(state)
+    configSecurity = state
+end, { Title = "Ir até o ponto inicial automaticamente" })
+
+-- Corrigindo o Dropdown (não pode começar vazio se não quebra em algumas UI libs)
+atualizarListaNavegacao()
+local rotasDropdownList = #listaDeRotas > 0 and listaDeRotas or {"Nenhuma"}
 
 local TasSaved = TasRecPage:CreateSection("Rotas Salvas")
-TasSaved:AddDropdown("Selecionar Rota", {"Nenhuma"}, false, function(selected) end, { Title = "Gerenciar rota salva" })
-TasSaved:AddButton("Iniciar / Parar", function() end, { Title = "Inicia ou pausa a rota salva selecionada" })
-TasSaved:AddToggle("Ver Rota", false, function(state) end, { Title = "Mostra a rota salva selecionada" })
-TasSaved:AddTextbox("Renomear", "Novo nome...", function(text) end, { Title = "Renomeia a rota selecionada" })
-TasSaved:AddButton("Deletar Rota", function() end, { Title = "Apaga a rota selecionada" })
+TasSaved:AddDropdown("Selecionar Rota", rotasDropdownList, false, function(selected)
+    rotaSelecionada = selected
+    mudarVisualizerSelecionado()
+end, { Title = "Gerenciar rota salva" })
 
--- Sub-aba: Utilitários e Visuais TAS
+TasSaved:AddButton("Iniciar / Parar", function()
+    if reproduzindo then
+        reproduzindo, slotAtivo = false, nil
+        Library:Notify({Title = "TAS", Description = "Reprodução Parada!", Duration = 3})
+    else
+        if rotaSelecionada ~= "Nenhuma" and rotasSalvas[rotaSelecionada] then
+            iniciarPlayback(rotasSalvas[rotaSelecionada])
+        else
+            Library:Notify({Title = "Erro", Description = "Selecione uma rota!", Duration = 3})
+        end
+    end
+end, { Title = "Inicia ou pausa a rota salva selecionada" })
+
+TasSaved:AddToggle("Ver Rota", true, function(state)
+    mostrarVisualizerSelecionada = state
+    mudarVisualizerSelecionado()
+end, { Title = "Mostra a rota salva selecionada" })
+
+TasSaved:AddTextbox("Renomear", "Novo nome...", function(text)
+    if rotaSelecionada ~= "Nenhuma" and rotasSalvas[rotaSelecionada] and text ~= "" and text ~= rotaSelecionada then
+        local dadosAntigos = rotasSalvas[rotaSelecionada]
+        deletarArquivoRota(rotaSelecionada)
+        rotasSalvas[rotaSelecionada] = nil
+        rotasSalvas[text] = dadosAntigos
+        salvarArquivoRota(text, dadosAntigos)
+        atualizarListaNavegacao(text)
+        mudarVisualizerSelecionado()
+        Library:Notify({Title = "TAS", Description = "Renomeada para " .. text, Duration = 3})
+    end
+end, { Title = "Renomeia a rota selecionada" })
+
+TasSaved:AddButton("Deletar Rota", function()
+    if rotaSelecionada ~= "Nenhuma" and rotasSalvas[rotaSelecionada] then
+        deletarArquivoRota(rotaSelecionada)
+        rotasSalvas[rotaSelecionada] = nil
+        atualizarListaNavegacao()
+        mudarVisualizerSelecionado()
+        Library:Notify({Title = "TAS", Description = "Rota apagada!", Duration = 3})
+    end
+end, { Title = "Apaga a rota selecionada" })
+
 local TasUtilsPage = TasTab:CreatePage("Utilitários & Visuais")
 local TasVisuals = TasUtilsPage:CreateSection("Renderização de Caminho")
-TasVisuals:AddToggle("Desenhar Linha (Tracer)", true, function(state) end, { Title = "Exibe o trajeto no mundo" })
-TasVisuals:AddToggle("Mostrar Nós (Waypoints)", false, function(state) end, { Title = "Exibe os pontos exatos salvos" })
-TasVisuals:AddColorPicker("Cor da Linha TAS", Color3.fromRGB(0, 255, 255), function(color) end, { Title = "Cor de Renderização" })
+TasVisuals:AddToggle("Desenhar Linha (Tracer)", true, function(state)
+    mostrarVisualizer = state
+    pastaLinhas.Parent = state and workspace or nil
+end, { Title = "Exibe o trajeto no mundo" })
 
 local TasExtra = TasUtilsPage:CreateSection("Funções Extras")
-TasExtra:AddToggle("Auto-Loop (Repetir Infinitamente)", false, function(state) end, { Title = "Reinicia ao fim da rota" })
-TasExtra:AddToggle("Ignorar Colisão no Play", true, function(state) end, { Title = "Atravessa paredes durante o TAS" })
-TasExtra:AddButton("Exportar Rota (JSON)", function() end, { Title = "Copia a rota para a área de transferência" })
+TasExtra:AddToggle("Auto-Loop (Repetir Infinitamente)", false, function(state)
+    loopAtivo = state
+end, { Title = "Reinicia ao fim da rota" })
 
--- ========================================== --
--- 👁️ TAB 5: VISUAL
--- ========================================== --
+TasExtra:AddButton("Exportar Rota (JSON)", function()
+    if rotaSelecionada ~= "Nenhuma" and rotasSalvas[rotaSelecionada] then
+        setclipboard(HttpService:JSONEncode(rotasSalvas[rotaSelecionada]))
+        Library:Notify({Title = "TAS", Description = "Copiado para a área de transferência!", Duration = 3})
+    else
+        Library:Notify({Title = "Erro", Description = "Nenhuma rota para exportar.", Duration = 3})
+    end
+end, { Title = "Copia a rota" })
+--------------------------------------------------------------------
+-- 👁️ VARIÁVEIS DO VISUAL
+--------------------------------------------------------------------
+local Fardas = {
+    ["Nenhuma"] = nil,
+    ["Oficiais"] = {S = "rbxassetid://14825639654", P = "rbxassetid://14825643510"},
+    ["Generais"] = {S = "rbxassetid://278436685", P = "rbxassetid://278437052"},
+    ["Elite"] = {S = "rbxassetid://75117162625698", P = "rbxassetid://132857388083739"}
+}
+local backups = {}
+local inputTargetNick, inputDisplayNick, inputPatente, inputDivisao = "", "", "", ""
+local selectedColor = Color3.fromRGB(192, 0, 255) -- Padrão: Vermelho Escarlate
+local usarTag = true
+local fardaSelecionada = "Nenhuma"
+local cargoStatus = "LIGTH" -- Padrão
+local deviceIcon = "🎮" -- Padrão Console
+local fullBrightConn
+
+--------------------------------------------------------------------
+-- 👁️ TAB 5: VISUAL (INTERFACE E LÓGICA)
+--------------------------------------------------------------------
 local VisualTab = Window:CreateTab("Visual", false, false)
-
--- Tudo unificado em uma única sub-aba "Geral"
 local VisualPage = VisualTab:CreatePage("Geral")
 
-local VisualDisfarceCard = VisualPage:CreateSection("Disfarçar (Overhead)")
-VisualDisfarceCard:AddTextbox("Modificar o player", "Vazio = você", function(text) end, { Title = "Alvo" })
-VisualDisfarceCard:AddTextbox("Nick Exibição", "Vazio = você", function(text) end, { Title = "Display" })
-VisualDisfarceCard:AddTextbox("Patente", "Ex: [CEL] Coronel", function(text) end, { Title = "Patente" })
-VisualDisfarceCard:AddTextbox("Divisão", "Ex: [BFE] Praças", function(text) end, { Title = "Divisão" })
-VisualDisfarceCard:AddDropdown("Dispositivo", {"🖥️", "📱","🎮"}, false, function(selected) end, { Title = "Dispositivo" })
-VisualDisfarceCard:AddToggle("Ativar club", true, function(state) end, { Title = "Club Tag" })
-VisualDisfarceCard:AddDropdown("Selecionar club", {"ELITE", "VICE", "LIGTH"}, false, function(selected) end, { Title = "Cargo" })
-VisualDisfarceCard:AddButton("Aplicar Disfarce", function() end)
-VisualDisfarceCard:AddButton("Desfazer Disfarce", function() end)
+local VisualDisfarceCard = VisualPage:CreateSection("Disfarçar (Overhead & Farda)")
+
+VisualDisfarceCard:AddTextbox("Modificar o player", "Vazio = você", function(text) inputTargetNick = text end, { Title = "Alvo" })
+VisualDisfarceCard:AddTextbox("Nick Exibição", "Vazio = princesinho0004", function(text) inputDisplayNick = text end, { Title = "Display" })
+VisualDisfarceCard:AddTextbox("Patente", "Vazio = [CR] Criador", function(text) inputPatente = text end, { Title = "Patente" })
+VisualDisfarceCard:AddTextbox("Divisão", "Vazio = discord.gg/havac", function(text) inputDivisao = text end, { Title = "Divisão" })
+
+VisualDisfarceCard:AddDropdown("Dispositivo", {"🎮", "🖥️", "📱"}, false, function(selected) deviceIcon = selected end, { Title = "Dispositivo" })
+VisualDisfarceCard:AddToggle("Ativar club", true, function(state) usarTag = state end, { Title = "Club Tag" })
+VisualDisfarceCard:AddDropdown("Selecionar club", {"LIGTH", "ELITE", "VICE"}, false, function(selected) cargoStatus = selected end, { Title = "Cargo" })
+
+-- Sistema de Fardas adicionado
+VisualDisfarceCard:AddDropdown("Selecionar Farda", {"Nenhuma", "Oficiais", "Generais", "Elite"}, false, function(selected) 
+    fardaSelecionada = selected 
+end, { Title = "Mudar Roupa" })
+
+-- O ColorPicker focado no padrão Escarlate
+VisualDisfarceCard:AddColorPicker("Cor da Overhead", selectedColor, function(color)
+    selectedColor = color
+end, { Title = "Cor do Texto" })
+
+
+VisualDisfarceCard:AddButton("Aplicar Disfarce", function()
+    local targetName = inputTargetNick ~= "" and inputTargetNick or player.Name
+    local targetChar = workspace:FindFirstChild(targetName)
+    
+    if not targetChar or not targetChar:FindFirstChild("Head") then 
+        Library:Notify({Title="Erro", Description="Jogador não encontrado no mapa!", Duration=3})
+        return 
+    end
+
+    local head = targetChar.Head
+    local labelNome = head:FindFirstChild("Nome", true) and head:FindFirstChild("Nome", true):FindFirstChildOfClass("TextLabel")
+    local labelPatente = head:FindFirstChild("Patente", true) and head:FindFirstChild("Patente", true):FindFirstChildOfClass("TextLabel")
+    local labelDivisao = (head:FindFirstChild("Divis\195\163o", true) or head:FindFirstChild("Divisão", true)) and (head:FindFirstChild("Divis\195\163o", true) or head:FindFirstChild("Divisão", true)):FindFirstChildOfClass("TextLabel")
+    
+    local shirt = targetChar:FindFirstChildOfClass("Shirt")
+    local pants = targetChar:FindFirstChildOfClass("Pants")
+
+    -- Sistema de Backup para poder restaurar depois (roupas e textos)
+    if not backups[targetName] then
+        backups[targetName] = {
+            ShirtTemplate = shirt and shirt.ShirtTemplate or nil, 
+            PantsTemplate = pants and pants.PantsTemplate or nil,
+            NomeText = labelNome and labelNome.Text or nil, 
+            NomeColor = labelNome and labelNome.TextColor3 or nil,
+            PatenteText = labelPatente and labelPatente.Text or nil, 
+            PatenteColor = labelPatente and labelPatente.TextColor3 or nil,
+            DivisaoText = labelDivisao and labelDivisao.Text or nil, 
+            DivisaoColor = labelDivisao and labelDivisao.TextColor3 or nil,
+        }
+    end
+
+    -- Aplicando os padrões (fallbacks) se o usuário deixou a caixa de texto em branco
+    local finalNick = inputDisplayNick ~= "" and inputDisplayNick or "princesinho0004"
+    local finalPatente = inputPatente ~= "" and inputPatente or "[CR] Criador"
+    local finalDivisao = inputDivisao ~= "" and inputDivisao or "discord.gg/havac"
+
+    local formattedName = usarTag and string.format("[%s] %s • %s", cargoStatus, deviceIcon, finalNick) or string.format("%s • %s", deviceIcon, finalNick)
+
+    -- Aplicando os textos e a cor
+    if labelNome then labelNome.Text = formattedName; labelNome.TextColor3 = selectedColor end
+    if labelPatente then labelPatente.Text = finalPatente; labelPatente.TextColor3 = selectedColor end
+    if labelDivisao then labelDivisao.Text = finalDivisao; labelDivisao.TextColor3 = selectedColor end
+
+    -- Aplicando a Farda (se o usuário selecionou uma)
+    if fardaSelecionada ~= "Nenhuma" and Fardas[fardaSelecionada] then
+        if shirt then shirt.ShirtTemplate = Fardas[fardaSelecionada].S end
+        if pants then pants.PantsTemplate = Fardas[fardaSelecionada].P end
+    end
+
+    Library:Notify({Title="Sucesso", Description="Disfarce aplicado em: " .. targetName, Duration=3})
+end)
+
+VisualDisfarceCard:AddButton("Desfazer Disfarce", function()
+    local targetName = inputTargetNick ~= "" and inputTargetNick or player.Name
+    local targetChar = workspace:FindFirstChild(targetName)
+    if not targetChar or not targetChar:FindFirstChild("Head") then return end
+
+    local backup = backups[targetName]
+    if not backup then 
+        Library:Notify({Title="Aviso", Description="Nenhum backup encontrado para este jogador.", Duration=3})
+        return 
+    end
+
+    local head = targetChar.Head
+    local labelNome = head:FindFirstChild("Nome", true) and head:FindFirstChild("Nome", true):FindFirstChildOfClass("TextLabel")
+    local labelPatente = head:FindFirstChild("Patente", true) and head:FindFirstChild("Patente", true):FindFirstChildOfClass("TextLabel")
+    local labelDivisao = (head:FindFirstChild("Divis\195\163o", true) or head:FindFirstChild("Divisão", true)) and (head:FindFirstChild("Divis\195\163o", true) or head:FindFirstChild("Divisão", true)):FindFirstChildOfClass("TextLabel")
+    local shirt = targetChar:FindFirstChildOfClass("Shirt")
+    local pants = targetChar:FindFirstChildOfClass("Pants")
+
+    -- Restaurando Textos
+    if labelNome and backup.NomeText then labelNome.Text = backup.NomeText; labelNome.TextColor3 = backup.NomeColor end
+    if labelPatente and backup.PatenteText then labelPatente.Text = backup.PatenteText; labelPatente.TextColor3 = backup.PatenteColor end
+    if labelDivisao and backup.DivisaoText then labelDivisao.Text = backup.DivisaoText; labelDivisao.TextColor3 = backup.DivisaoColor end
+    
+    -- Restaurando Roupas originais
+    if backup.ShirtTemplate and shirt then shirt.ShirtTemplate = backup.ShirtTemplate end
+    if backup.PantsTemplate and pants then pants.PantsTemplate = backup.PantsTemplate end
+
+    Library:Notify({Title="Restaurado", Description="Aparência original de " .. targetName .. " restaurada.", Duration=3})
+end)
 
 local OtimizacaoCard = VisualPage:CreateSection("Otimização & Câmera")
-OtimizacaoCard:AddSlider("FOV da Câmera", 70, 120, 70, function(val) end, { Title = "Campo de Visão (FOV)" })
-OtimizacaoCard:AddSlider("Max Zoom Distance", 10, 400, 128, function(val) end, { Title = "Distância Máxima de Zoom" })
-OtimizacaoCard:AddButton("Remover Texturas (Boost)", function() end)
-OtimizacaoCard:AddToggle("Fullbright (Brilho total)", false, function(state) end, { Title = "Visão Noturna" })
+OtimizacaoCard:AddSlider("FOV da Câmera", 70, 120, 70, function(val) workspace.CurrentCamera.FieldOfView = val end, { Title = "Campo de Visão" })
+OtimizacaoCard:AddSlider("Max Zoom Distance", 10, 400, 128, function(val) if player then player.CameraMaxZoomDistance = val end end, { Title = "Zoom Máximo" })
 
--- // Notificação Final
+OtimizacaoCard:AddButton("Remover Texturas (Boost)", function()
+    pcall(function()
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") and not v:IsA("Terrain") then v.Material = Enum.Material.SmoothPlastic; v.Reflectance = 0; v.CastShadow = false end
+        end
+        Lighting.GlobalShadows = false
+    end)
+    Library:Notify({Title="Otimização", Description="Texturas removidas com sucesso!", Duration=3})
+end)
+
+OtimizacaoCard:AddToggle("Fullbright", false, function(state)
+    if state then
+        fullBrightConn = RunService.RenderStepped:Connect(function()
+            Lighting.Brightness, Lighting.ClockTime, Lighting.FogEnd, Lighting.GlobalShadows = 2, 14, 100000, false
+        end)
+    else
+        if fullBrightConn then fullBrightConn:Disconnect(); fullBrightConn = nil end
+        Lighting.Brightness, Lighting.ClockTime, Lighting.GlobalShadows = 1, 12, true
+    end
+end, { Title = "Visão Noturna" })
+
 Library:Notify({
-    Title = "EB do Delta",
-    Description = "Interface carregada com sucesso!",
+    Title = "Módulo Visual",
+    Description = "Interface visual carregada!",
     Duration = 5
 })
