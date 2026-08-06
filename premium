@@ -1,6 +1,6 @@
 -- [[ EB DO DELTA - ZYRONX UI (REESTRUTURAÇÃO COMPLETA) ]] --
 
-local Library = loadstring(game:HttpGetAsync("https://pastefy.app/YoX4PJmf/raw"))()
+local Library = loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/princesinho404/unrenomed/refs/heads/main/ZyronX"))()
 
 -- // Whitelist
 Library.WhitelistedUsers = {
@@ -12,7 +12,7 @@ local Window = Library:CreateWindow({
     Title = "HAVAC MENU",
     Subtitle = "Versão Premium 1.0.2",
     SubtitleColor = Color3.fromRGB(190, 140, 255),
-    Logo = "rbxassetid://5013109572",
+    Logo = "rbxassetid://121574485496082",
     LogoSize = 40,
     
     SphereText = false, 
@@ -897,6 +897,7 @@ local pastaVisualizerTemp, pastaVisualizerSelecionada = nil, nil
 local indiceRotaAtual = 1
 local listaDeRotas = {}
 local rotaSelecionada = "Nenhuma"
+
 --------------------------------------------------------------------
 -- 🧠 FUNÇÕES LÓGICAS DO TAS (ARQUIVOS, FÍSICA E RENDERIZAÇÃO)
 --------------------------------------------------------------------
@@ -1131,6 +1132,7 @@ local function iniciarPlayback(slot)
     task.defer(function() reproduzindo = true end)
     Library:Notify({Title = "TAS", Description = "Reproduzindo Rota!", Duration = 3})
 end
+
 --------------------------------------------------------------------
 -- 🎥 TAB 4: TAS (Rica em Funções)
 --------------------------------------------------------------------
@@ -1146,27 +1148,16 @@ local TasSaved = TasRecPage:CreateSection("Rotas Salvas")
 -- ========================================================
 local DropdownRotas = nil
 
-local function atualizarDropdownUI(nomeParaSelecionar)
+local function atualizarDropdownUI()
     listaDeRotas = {}
     for nomeRota, _ in pairs(rotasSalvas) do table.insert(listaDeRotas, nomeRota) end
     table.sort(listaDeRotas)
-    if #listaDeRotas == 0 then listaDeRotas = {"Nenhuma"} end
     
-    -- Atualiza diretamente usando o objeto do Dropdown guardado na variável
-    if DropdownRotas then
-        -- Tentamos :Refresh() primeiro, que é o padrão da maioria das UIs
-        local sucesso = pcall(function() DropdownRotas:Refresh(listaDeRotas) end)
-        
-        -- Se der erro, tenta :SetOptions() (usado por algumas variações de biblioteca)
-        if not sucesso then
-            pcall(function() DropdownRotas:SetOptions(listaDeRotas) end)
-        end
-        
-        -- Se um nome foi passado (ex: após salvar), seleciona ele na UI
-        if nomeParaSelecionar then 
-            pcall(function() DropdownRotas:Set(nomeParaSelecionar) end)
-            pcall(function() DropdownRotas:SetValue(nomeParaSelecionar) end)
-        end
+    if #listaDeRotas == 0 then table.insert(listaDeRotas, "Nenhuma") end
+    
+    -- Busca o Dropdown direto da memória global que injetamos no Source!
+    if _G.ZyronX_Dropdowns and _G.ZyronX_Dropdowns["Selecionar Rota"] then
+        _G.ZyronX_Dropdowns["Selecionar Rota"]:Refresh(listaDeRotas)
     end
 end
 
@@ -1226,8 +1217,8 @@ TasControls:AddButton("Salvar Rota", function()
     atualizarListaNavegacao(nomeFinal)
     mudarVisualizerSelecionado()
     
-    -- Atualiza a UI do Dropdown
-    atualizarDropdownUI(nomeFinal)
+    -- Atualiza a UI do Dropdown com a nova lista
+    atualizarDropdownUI()
     
     Library:Notify({Title = "Sucesso", Description = "Rota salva!", Duration = 3})
 end, { Title = "Salva a rota temporária" })
@@ -1250,7 +1241,7 @@ end, { Title = "Ir até o ponto inicial automaticamente" })
 atualizarListaNavegacao()
 local rotasDropdownList = #listaDeRotas > 0 and listaDeRotas or {"Nenhuma"}
 
--- AQUI ESTAVA O ERRO: Salvei a criação na variável "DropdownRotas"
+-- Agora criamos e armazenamos o retorno da função (que graças a modificação no source, contém o :Refresh)
 DropdownRotas = TasSaved:AddDropdown("Selecionar Rota", rotasDropdownList, false, function(selected)
     rotaSelecionada = selected
     mudarVisualizerSelecionado()
@@ -1285,7 +1276,7 @@ TasSaved:AddTextbox("Renomear", "Novo nome...", function(text)
         mudarVisualizerSelecionado()
         
         -- Atualiza a UI do Dropdown
-        atualizarDropdownUI(text)
+        atualizarDropdownUI()
         
         Library:Notify({Title = "TAS", Description = "Renomeada para " .. text, Duration = 3})
     end
@@ -1299,7 +1290,7 @@ TasSaved:AddButton("Deletar Rota", function()
         mudarVisualizerSelecionado()
         
         -- Atualiza a UI do Dropdown
-        atualizarDropdownUI("Nenhuma")
+        atualizarDropdownUI()
         
         Library:Notify({Title = "TAS", Description = "Rota apagada!", Duration = 3})
     end
