@@ -1,367 +1,5 @@
-
--- // ZyronX UI Library (Core Engine) - Optimized for Zero Lag Loops & Mobile Scaling
-
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
-local RunService = game:GetService("RunService")
-local HttpService = game:GetService("HttpService")
-local TextService = game:GetService("TextService")
-
-local Library = {
-    WhitelistedUsers = {} 
-}
-
--- // Utility: File System Mock Overrides
-local _isfolder = isfolder or function() return true end
-local _makefolder = makefolder or function() end
-local _writefile = writefile or function(path, data) warn("File saving not supported on this executor.") end
-local _readfile = readfile or function() return "{}" end
-local _listfiles = listfiles or function() return {} end
-local _delfile = delfile or function() warn("File deletion not supported.") end
-
--- // Utility: Safe Clipboard Copy
-local function SafeCopyToClipboard(text)
-    if setclipboard then
-        setclipboard(text)
-    elseif toclipboard then
-        toclipboard(text)
-    else
-        warn("Clipboard copying is not supported on your current executor.")
-    end
-end
-
--- // Utility: Instance Creator
-local function Create(className, properties)
-    local instance = Instance.new(className)
-    
-    if className == "TextBox" then
-        instance.Text = ""
-    end
-
-    for k, v in pairs(properties or {}) do
-        instance[k] = v
-    end
-    
-    if (className == "TextLabel" or className == "TextButton" or className == "TextBox") then
-        if properties.TextSize and properties.RichText ~= true then
-            instance.TextScaled = true
-            local constraint = Instance.new("UITextSizeConstraint")
-            constraint.MaxTextSize = properties.TextSize
-            constraint.MinTextSize = 6
-            constraint.Parent = instance
-        end
-    end
-    
-    return instance
-end
-
--- // Utility: Build search index for a card (cached)
-local function BuildSearchIndex(card)
-    local parts = {}
-    for _, desc in ipairs(card:GetDescendants()) do
-        if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then
-            if desc.Text and desc.Text ~= "" then
-                table.insert(parts, desc.Text:lower())
-            end
-        end
-    end
-    return table.concat(parts, " ")
-end
-
--- // Utility: Smooth Tweening
-local function Tween(instance, properties, duration)
-    duration = duration or 0.25
-    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-    local tween = TweenService:Create(instance, tweenInfo, properties)
-    tween:Play()
-    return tween
-end
-
--- // Utility: Micro-Interaction Bounce
-local function AddBounce(button, scaleFactor)
-    scaleFactor = scaleFactor or 0.96
-    local scaleObj = button:FindFirstChild("UIScale") or Create("UIScale", {Parent = button, Scale = 1})
-    button.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            Tween(scaleObj, {Scale = scaleFactor}, 0.15)
-        end
-    end)
-    button.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            Tween(scaleObj, {Scale = 1}, 0.15)
-        end
-    end)
-    button.MouseLeave:Connect(function()
-        Tween(scaleObj, {Scale = 1}, 0.15)
-    end)
-end
-
--- // Utility: Draggable
-local function MakeDraggable(topbar, object)
-    topbar.Active = true
-    object.Active = true
-    local dragging, dragInput, dragStart, startPos
-    
-    topbar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = object.Position
-            
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
-    
-    topbar.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-    
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            Tween(object, {Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)}, 0.08)
-        end
-    end)
-end
-
-local AccentColor = Color3.fromRGB(190, 140, 255)
-local BackgroundColor = Color3.fromRGB(18, 18, 20)
-local CardColor = Color3.fromRGB(24, 24, 27)
-local HoverColor = Color3.fromRGB(35, 35, 40)
-local TextColor = Color3.fromRGB(240, 240, 240)
-local SubTextColor = Color3.fromRGB(150, 150, 150)
-
--- // Global Notification API
-local GlobalNotifContainer
-
-function Library:Notify(options)
-    if not GlobalNotifContainer then return end
-    local title = options.Title or "Notification"
-    local desc = options.Description or "Information updated."
-    local duration = options.Duration or 3
-
-    local Notif = Create("Frame", {Parent = GlobalNotifContainer, BackgroundColor3 = Color3.fromRGB(20, 20, 22), Size = UDim2.new(1, 0, 0, 65), BackgroundTransparency = 1, ZIndex = 201, ClipsDescendants = true})
-    Create("UICorner", {Parent = Notif, CornerRadius = UDim.new(0, 8)})
-    local Stroke = Create("UIStroke", {Parent = Notif, Color = AccentColor, Thickness = 1.5, Transparency = 1})
-
-    local TitleText = Create("TextLabel", {Parent = Notif, Text = title, Font = Enum.Font.GothamBold, TextSize = 13, TextColor3 = TextColor, BackgroundTransparency = 1, Position = UDim2.new(0, 15, 0, 15), Size = UDim2.new(1, -30, 0, 15), TextXAlignment = Enum.TextXAlignment.Left, TextTransparency = 1, ZIndex = 202})
-    local DescText = Create("TextLabel", {Parent = Notif, Text = desc, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = SubTextColor, BackgroundTransparency = 1, Position = UDim2.new(0, 15, 0, 32), Size = UDim2.new(1, -30, 0, 15), TextXAlignment = Enum.TextXAlignment.Left, TextTransparency = 1, ZIndex = 202})
-
-    Tween(Notif, {BackgroundTransparency = 0}, 0.3)
-    Tween(Stroke, {Transparency = 0}, 0.3)
-    Tween(TitleText, {TextTransparency = 0}, 0.3)
-    Tween(DescText, {TextTransparency = 0}, 0.3)
-
-    task.delay(duration, function()
-        Tween(Notif, {BackgroundTransparency = 1}, 0.4)
-        Tween(Stroke, {Transparency = 1}, 0.4)
-        Tween(TitleText, {TextTransparency = 1}, 0.4)
-        Tween(DescText, {TextTransparency = 1}, 0.4)
-        task.wait(0.4)
-        Notif:Destroy()
-    end)
-end
-
-function Library:CreateWindow(options)
-    local hubName = "ZyronX Ui Lib"
-    local subText = "Made By Hypol-X"
-    local subColor = AccentColor
-    local sphTextToggle = false
-    local sphWords = "ZX"
-    local sphImage = nil
-    local topbarLogo = nil
-    local logoSize = 32
-    local sphIconSize = 26
-    local toggleKey = Enum.KeyCode.K -- Nova variável para a tecla de toggle
-
-    if type(options) == "table" then
-        hubName = options.Title or hubName
-        subText = options.Subtitle or subText
-        subColor = options.SubtitleColor or subColor
-        
-        if options.SphereText ~= nil then sphTextToggle = options.SphereText end
-        if options.SphereWords ~= nil then
-            local wordList = string.split(tostring(options.SphereWords), " ")
-            if #wordList > 2 then sphWords = wordList[1] .. " " .. wordList[2]
-            else sphWords = tostring(options.SphereWords) end
-        end
-        if options.ToggleKey ~= nil then toggleKey = options.ToggleKey end
-        
-        sphImage = options.SphereImage
-        topbarLogo = options.Logo
-        logoSize = options.LogoSize or 32
-        sphIconSize = options.SphereIconSize or 26
-    elseif type(options) == "string" then
-        hubName = options
-    end
-
-    local uniqueID = HttpService:GenerateGUID(false)
-    local ScreenGui = Create("ScreenGui", {
-        Name = "ZyronX_UI_" .. uniqueID,
-        Parent = RunService:IsStudio() and game.Players.LocalPlayer:WaitForChild("PlayerGui") or CoreGui,
-        ResetOnSpawn = false,
-        IgnoreGuiInset = true
-    })
-
-    local NotifContainer = Create("Frame", {
-        Parent = ScreenGui, BackgroundTransparency = 1, Size = UDim2.new(0, 320, 1, -20),
-        Position = UDim2.new(1, -340, 0, 10), ZIndex = 200, Active = false
-    })
-    Create("UIListLayout", {Parent = NotifContainer, VerticalAlignment = Enum.VerticalAlignment.Bottom, HorizontalAlignment = Enum.HorizontalAlignment.Right, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 12)})
-    GlobalNotifContainer = NotifContainer
-
-    -- Verifica se é dispositivo Mobile para aplicar a escala correta
-    local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
-    local baseScale = isMobile and 0.65 or 1 -- Encolhe uniformemente no mobile
-
-    local MainFrame = Create("Frame", {Parent = ScreenGui, BackgroundColor3 = BackgroundColor, Size = UDim2.new(0, 650, 0, 420), Position = UDim2.new(0.5, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5), ClipsDescendants = true, BackgroundTransparency = 1, Active = true})
-    local MainScale = Create("UIScale", {Parent = MainFrame, Scale = 0.8})
-    Create("UICorner", {Parent = MainFrame, CornerRadius = UDim.new(0, 8)})
-    Create("UIStroke", {Parent = MainFrame, Color = Color3.fromRGB(40, 40, 45), Thickness = 1})
-    Tween(MainScale, {Scale = baseScale}, 0.5)
-    Tween(MainFrame, {BackgroundTransparency = 0}, 0.5)
-
-    -- Floating Bottom Bar Natively Attached to ScreenGui
-    local BottomDragHitbox = Create("Frame", {Parent = ScreenGui, BackgroundTransparency = 1, Size = UDim2.new(0, 350, 0, 30), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 145, Active = true})
-    local FloatingBottomBar = Create("Frame", {Parent = BottomDragHitbox, BackgroundColor3 = CardColor, BackgroundTransparency = 0, Size = UDim2.new(1, 0, 0, 6), Position = UDim2.new(0, 0, 0.5, -3), ZIndex = 146})
-    Create("UICorner", {Parent = FloatingBottomBar, CornerRadius = UDim.new(1, 0)})
-    local BottomBarStroke = Create("UIStroke", {Parent = FloatingBottomBar, Color = Color3.fromRGB(50, 50, 55), Thickness = 1.2, Transparency = 0})
-
-    MakeDraggable(BottomDragHitbox, MainFrame)
-
-    RunService.RenderStepped:Connect(function()
-        if MainFrame and MainFrame.Visible then
-            BottomDragHitbox.Visible = true
-            local currentScale = MainScale.Scale
-            local frameHeight = 420 * currentScale
-            local frameWidth = 650 * currentScale
-            BottomDragHitbox.Position = UDim2.new(MainFrame.Position.X.Scale, MainFrame.Position.X.Offset, MainFrame.Position.Y.Scale, MainFrame.Position.Y.Offset + (frameHeight / 2) + 20)
-            BottomDragHitbox.Size = UDim2.new(0, frameWidth * 0.6, 0, 30 * currentScale)
-            FloatingBottomBar.Size = UDim2.new(1, 0, 0, 6 * currentScale)
-            FloatingBottomBar.Position = UDim2.new(0, 0, 0.5, -(3 * currentScale))
-        else
-            BottomDragHitbox.Visible = false
-        end
-    end)
-
-    local TopBar = Create("Frame", {Parent = MainFrame, BackgroundColor3 = BackgroundColor, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 0, 0), Active = true})
-    MakeDraggable(TopBar, MainFrame)
-    
-    local titleOffsetX = 15
-    if topbarLogo then
-        Create("ImageLabel", {Parent = TopBar, BackgroundTransparency = 1, Size = UDim2.new(0, logoSize, 0, logoSize), Position = UDim2.new(0, 8, 0.5, -(logoSize / 2)), Image = topbarLogo, ScaleType = Enum.ScaleType.Fit})
-        titleOffsetX = 8 + logoSize + 8
-    end
-
-    local TitleContainer = Create("Frame", {Parent = TopBar, BackgroundTransparency = 1, Size = UDim2.new(0, 160, 1, 0), Position = UDim2.new(0, titleOffsetX, 0, 0)})
-    local Title = Create("TextLabel", {Parent = TitleContainer, Text = hubName, Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = TextColor, BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 5), Size = UDim2.new(1, 0, 0, 16), TextXAlignment = Enum.TextXAlignment.Left})
-    local Subtitle = Create("TextLabel", {Parent = TitleContainer, Text = subText, Font = Enum.Font.Gotham, TextSize = 10, TextColor3 = subColor, BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 22), Size = UDim2.new(1, 0, 0, 12), TextXAlignment = Enum.TextXAlignment.Left})
-
-    local SearchBar = Create("Frame", {Parent = TopBar, BackgroundColor3 = CardColor, Size = UDim2.new(0, 250, 0, 26), Position = UDim2.new(0, 180, 0.5, -13)})
-    Create("UICorner", {Parent = SearchBar, CornerRadius = UDim.new(0, 6)})
-    Create("ImageLabel", {Parent = SearchBar, BackgroundTransparency = 1, Image = "rbxassetid://6031154871", ImageColor3 = SubTextColor, Size = UDim2.new(0, 14, 0, 14), Position = UDim2.new(0, 8, 0.5, -7)})
-    local SearchInput = Create("TextBox", {Parent = SearchBar, BackgroundTransparency = 1, Size = UDim2.new(1, -30, 1, 0), Position = UDim2.new(0, 30, 0, 0), Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = TextColor, PlaceholderText = "Search..", TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false})
-
-    local CloseBtn = Create("TextButton", {Parent = TopBar, Text = "X", Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(0, 30, 1, 0), Position = UDim2.new(1, -35, 0, 0)})
-    local MinBtn = Create("TextButton", {Parent = TopBar, Text = "—", Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(0, 30, 1, 0), Position = UDim2.new(1, -65, 0, 0)})
-
-    local Sidebar = Create("Frame", {Parent = MainFrame, BackgroundColor3 = BackgroundColor, BackgroundTransparency = 1, Size = UDim2.new(0, 160, 1, -40), Position = UDim2.new(0, 0, 0, 40), Active = true})
-    local TabSearchBox = Create("TextBox", {Parent = Sidebar, BackgroundColor3 = CardColor, Size = UDim2.new(1, -20, 0, 26), Position = UDim2.new(0, 10, 0, 5), Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = TextColor, PlaceholderText = "Search tabs...", TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false})
-    Create("UIPadding", {Parent = TabSearchBox, PaddingLeft = UDim.new(0, 8)})
-    Create("UICorner", {Parent = TabSearchBox, CornerRadius = UDim.new(0, 4)})
-    Create("UIStroke", {Parent = TabSearchBox, Color = Color3.fromRGB(45, 45, 50), Thickness = 1})
-    
-    local TabContainer = Create("ScrollingFrame", {Parent = Sidebar, BackgroundTransparency = 1, Size = UDim2.new(1, -15, 1, -40), Position = UDim2.new(0, 10, 0, 40), ScrollBarThickness = 0})
-    Create("UIListLayout", {Parent = TabContainer, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5)})
-    Create("Frame", {Parent = MainFrame, BackgroundColor3 = Color3.fromRGB(40, 40, 45), BorderSizePixel = 0, Size = UDim2.new(0, 1, 1, -40), Position = UDim2.new(0, 160, 0, 40)})
-
-    local ContentArea = Create("Frame", {Parent = MainFrame, BackgroundTransparency = 1, Size = UDim2.new(1, -165, 1, -40), Position = UDim2.new(0, 165, 0, 40), Active = true})
-
-    local Sphere = Create("ImageButton", {Parent = ScreenGui, BackgroundColor3 = BackgroundColor, BackgroundTransparency = 0.2, Size = UDim2.new(0, 50, 0, 50), Position = UDim2.new(0.5, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5), Visible = false, AutoButtonColor = false, ImageTransparency = 1, ClipsDescendants = true})
-    Create("UICorner", {Parent = Sphere, CornerRadius = UDim.new(1, 0)})
-    Create("UIStroke", {Parent = Sphere, Color = AccentColor, Thickness = 2})
-    
-    local SphereImageLabel = Create("ImageLabel", {Parent = Sphere, BackgroundTransparency = 1, Size = UDim2.new(0, sphIconSize, 0, sphIconSize), Position = UDim2.new(0.5, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5), Image = sphImage or "", ImageTransparency = 1, Visible = (not sphTextToggle and sphImage ~= nil)})
-    local SphereTextLabel = Create("TextLabel", {Parent = Sphere, Text = sphWords, Font = Enum.Font.GothamBold, TextSize = 16, TextColor3 = AccentColor, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), TextTransparency = 1, Visible = sphTextToggle})
-    MakeDraggable(Sphere, Sphere)
-
-    local Window = {CurrentTab = nil, Tabs = {}, Title = Title, AllCards = {}, MainFrame = MainFrame, CurrentTransparency = 0, ConfigElements = {}}
-
-    function Window:SetTransparency(val)
-        Window.CurrentTransparency = val
-        if MainFrame.Visible then
-            Tween(MainFrame, {BackgroundTransparency = val}, 0.3)
-            Tween(FloatingBottomBar, {BackgroundTransparency = val > 0 and 0.2 or 0}, 0.3)
-        end
-    end
-
-    local function MinimazeUI()
-        Tween(MainScale, {Scale = 0}, 0.4)
-        Tween(MainFrame, {BackgroundTransparency = 1}, 0.4)
-        Tween(FloatingBottomBar, {BackgroundTransparency = 1}, 0.4)
-        Tween(BottomBarStroke, {Transparency = 1}, 0.4)
-        task.wait(0.3)
-        MainFrame.Visible = false
-        BottomDragHitbox.Visible = false
-        Sphere.Visible = true
-        Tween(Sphere, {Size = UDim2.new(0, 50, 0, 50)}, 0.4)
-        if not sphTextToggle and sphImage then Tween(SphereImageLabel, {ImageTransparency = 0}, 0.4)
-        elseif sphTextToggle then Tween(SphereTextLabel, {TextTransparency = 0}, 0.4) end
-    end
-
-    local function MaximizeUI()
-        Tween(Sphere, {Size = UDim2.new(0, 0, 0, 0)}, 0.3)
-        if not sphTextToggle and sphImage then Tween(SphereImageLabel, {ImageTransparency = 1}, 0.3) end
-        if sphTextToggle then Tween(SphereTextLabel, {TextTransparency = 1}, 0.3) end
-        
-        task.wait(0.2)
-        Sphere.Visible = false
-        MainFrame.Visible = true
-        BottomDragHitbox.Visible = true
-        Tween(MainScale, {Scale = baseScale}, 0.4) -- Escala base com ajuste mobile
-        Tween(MainFrame, {BackgroundTransparency = Window.CurrentTransparency}, 0.4)
-        Tween(FloatingBottomBar, {BackgroundTransparency = Window.CurrentTransparency > 0 and 0.2 or 0}, 0.4)
-        Tween(BottomBarStroke, {Transparency = 0}, 0.4)
-    end
-
-    MinBtn.MouseButton1Click:Connect(MinimazeUI)
-    Sphere.MouseButton1Click:Connect(MaximizeUI)
-
-    -- Toggle da UI Inteira Apertando Tecla "K" (ou a tecla passada na config)
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if not gameProcessed and input.KeyCode == toggleKey then
-            if MainFrame.Visible then MinimazeUI() else MaximizeUI() end
-        end
-    end)
-
-    -- Lógica de Popup, Tabs e Content omitted aqui para simplificar (mantida igual ao original)
-    -- ... [Mantendo as funcionalidades Popups, Tab Container]
-    
-    -- Abaixo focado diretamente na API de Componentes (Elements)
-    function Window:CreateTab(tabName, isDefault, isLocked)
-        local TabBtn = Create("TextButton", {Parent = TabContainer, Text = "", BackgroundColor3 = HoverColor, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 35), AutoButtonColor = false})
-        Create("UICorner", {Parent = TabBtn, CornerRadius = UDim.new(0, 6)})
-        local Indicator = Create("Frame", {Name = "Indicator", Parent = TabBtn, BackgroundColor3 = isLocked and Color3.fromRGB(255, 215, 0) or AccentColor, Size = UDim2.new(0, 3, 0, 0), Position = UDim2.new(0, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5)})
-        Create("UICorner", {Parent = Indicator, CornerRadius = UDim.new(1, 0)})
-        local Txt = Create("TextLabel", {Parent = TabO código da sua ZyronX UI está muito bem estruturado e com animações muito fluidas[cite: 1]! Adicionar essas opções de acessibilidade e customização vai deixar a experiência ainda mais profissional.
-
-Aqui está o resumo das alterações que fiz no seu código base[cite: 1]:
-
-*   **Escala Mobile Inteligente:** Adicionei uma verificação usando o `UserInputService` para detectar se o jogador está em um celular/tablet (tem touch, mas não tem mouse). Se for mobile, a interface abre com uma escala base de `0.65` (ou o valor que preferir), encolhendo tudo uniformemente sem distorcer. No PC, mantém a escala de `1`.
-*   **Caixa de RGB no Color Picker:** Aumentei um pouco a área do Color Picker quando expandida e adicionei uma `TextBox` nativa embaixo das cores. Você pode digitar valores como `255, 0, 0` e ele atualiza o hex e o slider visual na mesma hora.
-*   **Tecla de Atalho (Toggle K):** Criei um `InputBegan` no final da função de criar a janela que escuta a tecla **K**. Quando pressionada, ela faz o tween de saída e esconde a UI principal e a esfera flutuante completamente. Apertando **K** novamente, ela volta.
-
-Aqui está o código completo modificado para você apenas copiar e colar:
-
-```lua
 -- // ZyronX UI Library (Core Engine) - Optimized for Zero Lag Loops
+-- // Modificações: Escala Mobile, RGB Input no ColorPicker e Toggle K
 
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -370,13 +8,13 @@ local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local TextService = game:GetService("TextService")
 
+-- Verifica se é mobile (Touch ligado, Mouse desligado)
+local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+local BASE_SCALE = isMobile and 0.65 or 1
+
 local Library = {
     WhitelistedUsers = {} 
 }
-
--- Detecção Mobile
-local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
-local baseScale = isMobile and 0.65 or 1 -- Fica menorzinho no celular
 
 -- // Utility: File System Mock Overrides
 local _isfolder = isfolder or function() return true end
@@ -579,6 +217,16 @@ function Library:CreateWindow(options)
         IgnoreGuiInset = true
     })
 
+    -- Toggle K
+    local isUIHidden = false
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode.K then
+            isUIHidden = not isUIHidden
+            ScreenGui.Enabled = not isUIHidden
+        end
+    end)
+
     local NotifContainer = Create("Frame", {
         Parent = ScreenGui,
         BackgroundTransparency = 1,
@@ -689,10 +337,10 @@ function Library:CreateWindow(options)
     end
 
     local MainFrame = Create("Frame", {Parent = ScreenGui, BackgroundColor3 = BackgroundColor, Size = UDim2.new(0, 650, 0, 420), Position = UDim2.new(0.5, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5), ClipsDescendants = true, BackgroundTransparency = 1, Active = true})
-    local MainScale = Create("UIScale", {Parent = MainFrame, Scale = 0.8})
+    local MainScale = Create("UIScale", {Parent = MainFrame, Scale = 0.4})
     Create("UICorner", {Parent = MainFrame, CornerRadius = UDim.new(0, 8)})
     Create("UIStroke", {Parent = MainFrame, Color = Color3.fromRGB(40, 40, 45), Thickness = 1})
-    Tween(MainScale, {Scale = baseScale}, 0.5)
+    Tween(MainScale, {Scale = BASE_SCALE}, 0.5)
     Tween(MainFrame, {BackgroundTransparency = 0}, 0.5)
 
     -- // CORE ENGINE ADDITION: Floating Bottom Bar Natively Attached to ScreenGui
@@ -812,7 +460,7 @@ function Library:CreateWindow(options)
         MainFrame.Visible = false
         BottomDragHitbox.Visible = false
         Sphere.Visible = true
-        Tween(Sphere, {Size = UDim2.new(0, 50 * baseScale, 0, 50 * baseScale)}, 0.4)
+        Tween(Sphere, {Size = UDim2.new(0, 50, 0, 50)}, 0.4)
         
         if not sphTextToggle and sphImage then
             Tween(SphereImageLabel, {ImageTransparency = 0}, 0.4)
@@ -831,37 +479,10 @@ function Library:CreateWindow(options)
         Sphere.Visible = false
         MainFrame.Visible = true
         BottomDragHitbox.Visible = true
-        Tween(MainScale, {Scale = baseScale}, 0.4)
+        Tween(MainScale, {Scale = BASE_SCALE}, 0.4)
         Tween(MainFrame, {BackgroundTransparency = Window.CurrentTransparency}, 0.4)
         Tween(FloatingBottomBar, {BackgroundTransparency = Window.CurrentTransparency > 0 and 0.2 or 0}, 0.4)
         Tween(BottomBarStroke, {Transparency = 0}, 0.4)
-    end)
-
-    -- Toggle System (Tecla K)
-    local toggleBind = Enum.KeyCode.K
-    local uiHidden = false
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if not gameProcessed and input.KeyCode == toggleBind then
-            uiHidden = not uiHidden
-            if uiHidden then
-                Tween(MainScale, {Scale = 0}, 0.3)
-                Tween(MainFrame, {BackgroundTransparency = 1}, 0.3)
-                Tween(FloatingBottomBar, {BackgroundTransparency = 1}, 0.3)
-                Tween(BottomBarStroke, {Transparency = 1}, 0.3)
-                Tween(Sphere, {Size = UDim2.new(0, 0, 0, 0)}, 0.3)
-                task.wait(0.3)
-                MainFrame.Visible = false
-                BottomDragHitbox.Visible = false
-                Sphere.Visible = false
-            else
-                MainFrame.Visible = true
-                BottomDragHitbox.Visible = true
-                Tween(MainScale, {Scale = baseScale}, 0.3)
-                Tween(MainFrame, {BackgroundTransparency = Window.CurrentTransparency}, 0.3)
-                Tween(FloatingBottomBar, {BackgroundTransparency = Window.CurrentTransparency > 0 and 0.2 or 0}, 0.3)
-                Tween(BottomBarStroke, {Transparency = 0}, 0.3)
-            end
-        end
     end)
 
     local Popup = Create("Frame", {Parent = ScreenGui, BackgroundColor3 = Color3.fromRGB(0, 0, 0), BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), ZIndex = 100, Visible = false, Active = true})
@@ -882,7 +503,7 @@ function Library:CreateWindow(options)
         Popup.Visible = true
         Tween(Popup, {BackgroundTransparency = 0.5}, 0.3)
         Tween(PopupCard, {BackgroundTransparency = 0}, 0.3)
-        Tween(PopupScale, {Scale = baseScale}, 0.3)
+        Tween(PopupScale, {Scale = 1}, 0.3)
         Tween(PopupStroke, {Transparency = 0}, 0.3)
         Tween(PopupTitle, {TextTransparency = 0}, 0.3)
         Tween(PopupText, {TextTransparency = 0}, 0.3)
@@ -898,7 +519,7 @@ function Library:CreateWindow(options)
         Tween(PopupText, {TextTransparency = 1}, 0.3)
         Tween(YesBtn, {BackgroundTransparency = 1, TextTransparency = 1}, 0.3)
         Tween(NoBtn, {BackgroundTransparency = 1, TextTransparency = 1}, 0.3)
-        Tween(MainScale, {Scale = 0.8}, 0.3)
+        Tween(MainScale, {Scale = 0.4}, 0.3)
         Tween(MainFrame, {BackgroundTransparency = 1}, 0.3)
         Tween(FloatingBottomBar, {BackgroundTransparency = 1}, 0.3)
         Tween(BottomBarStroke, {Transparency = 1}, 0.3)
@@ -1329,7 +950,6 @@ function Library:CreateWindow(options)
                     Window.ConfigElements[name] = { Set = internalSet, Get = function() return selected end }
 
                     local DropdownAPI = {}
-                    
                     function DropdownAPI:Refresh(newOptions)
                         for _, btn in ipairs(optionButtons) do
                             btn:Destroy()
@@ -1404,8 +1024,8 @@ function Library:CreateWindow(options)
                     Create("UIStroke", {Parent = DisplayBtn, Color = Color3.fromRGB(255,255,255), Transparency = 0.8, Thickness = 1})
                     AddBounce(DisplayBtn)
 
-                    -- Area Expandida para caber o Input de RGB
-                    local PickerArea = Create("Frame", {Parent = CFrame, BackgroundColor3 = BackgroundColor, Size = UDim2.new(1, -20, 0, 175), Position = UDim2.new(0, 10, 0, 35)})
+                    -- Area Expandida para acomodar o input RGB
+                    local PickerArea = Create("Frame", {Parent = CFrame, BackgroundColor3 = BackgroundColor, Size = UDim2.new(1, -20, 0, 170), Position = UDim2.new(0, 10, 0, 35)})
                     Create("UICorner", {Parent = PickerArea, CornerRadius = UDim.new(0, 4)})
 
                     local PickerClose = Create("TextButton", {Parent = PickerArea, Text = "X", Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = SubTextColor, BackgroundColor3 = Color3.fromRGB(30, 20, 20), Size = UDim2.new(0, 18, 0, 18), Position = UDim2.new(1, -22, 0, 4), ZIndex = 50, AutoButtonColor = false})
@@ -1437,11 +1057,12 @@ function Library:CreateWindow(options)
                     local HueRing = Create("Frame", {Parent = HueSlider, Size = UDim2.new(0, 6, 0, 15), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(h, 0, 0.5, 0), BackgroundColor3 = Color3.new(1,1,1)})
                     Create("UICorner", {Parent = HueRing, CornerRadius = UDim.new(0, 2)})
                     Create("UIStroke", {Parent = HueRing, Color = Color3.new(0,0,0), Thickness = 1})
-
-                    -- RGB Input Box
-                    local RGBInput = Create("TextBox", {Parent = PickerArea, PlaceholderText = "R, G, B", Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = TextColor, BackgroundColor3 = Color3.fromRGB(15, 15, 18), Size = UDim2.new(1, -20, 0, 24), Position = UDim2.new(0, 10, 0, 135), TextXAlignment = Enum.TextXAlignment.Center, ClearTextOnFocus = false})
+                    
+                    -- // Modificação: RGB Input
+                    local initialRGB = string.format("%d, %d, %d", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
+                    local RGBInput = Create("TextBox", {Parent = PickerArea, Text = initialRGB, PlaceholderText = "R, G, B", Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = TextColor, BackgroundColor3 = Color3.fromRGB(25, 25, 30), Size = UDim2.new(1, -20, 0, 24), Position = UDim2.new(0, 10, 0, 135), ClearTextOnFocus = false})
                     Create("UICorner", {Parent = RGBInput, CornerRadius = UDim.new(0, 4)})
-                    Create("UIStroke", {Parent = RGBInput, Color = Color3.fromRGB(45, 45, 50), Thickness = 1})
+                    Create("UIStroke", {Parent = RGBInput, Color = Color3.fromRGB(50, 50, 55), Thickness = 1})
 
                     local function internalSet(hexString)
                         local s_check, c = pcall(function() return Color3.fromHex(hexString) end)
@@ -1452,24 +1073,13 @@ function Library:CreateWindow(options)
                             SVMap.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
                             SVRing.Position = UDim2.new(s, 0, 1-v_hsv, 0)
                             HueRing.Position = UDim2.new(h, 0, 0.5, 0)
-                            RGBInput.Text = math.floor(color.R * 255) .. ", " .. math.floor(color.G * 255) .. ", " .. math.floor(color.B * 255)
+                            RGBInput.Text = string.format("%d, %d, %d", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
                             if callback then callback(color) end
                         end
                     end
 
-                    local function UpdateColor()
-                        color = Color3.fromHSV(h, s, v_hsv)
-                        DisplayBtn.BackgroundColor3 = color
-                        SVMap.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-                        RGBInput.Text = math.floor(color.R * 255) .. ", " .. math.floor(color.G * 255) .. ", " .. math.floor(color.B * 255)
-                        if callback then callback(color) end
-                    end
-
-                    -- Forçar texto inicial no RGB
-                    RGBInput.Text = math.floor(color.R * 255) .. ", " .. math.floor(color.G * 255) .. ", " .. math.floor(color.B * 255)
-
                     RGBInput.FocusLost:Connect(function()
-                        local r, g, b = RGBInput.Text:match("(%d+)%D+(%d+)%D+(%d+)")
+                        local r, g, b = string.match(RGBInput.Text, "(%d+)%D+(%d+)%D+(%d+)")
                         if r and g and b then
                             r = math.clamp(tonumber(r), 0, 255)
                             g = math.clamp(tonumber(g), 0, 255)
@@ -1477,10 +1087,17 @@ function Library:CreateWindow(options)
                             local newColor = Color3.fromRGB(r, g, b)
                             internalSet(newColor:ToHex())
                         else
-                            -- Se digitou errado, volta pro antigo
-                            RGBInput.Text = math.floor(color.R * 255) .. ", " .. math.floor(color.G * 255) .. ", " .. math.floor(color.B * 255)
+                            RGBInput.Text = string.format("%d, %d, %d", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
                         end
                     end)
+
+                    local function UpdateColor()
+                        color = Color3.fromHSV(h, s, v_hsv)
+                        DisplayBtn.BackgroundColor3 = color
+                        SVMap.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+                        RGBInput.Text = string.format("%d, %d, %d", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
+                        if callback then callback(color) end
+                    end
 
                     local draggingSV = false
                     local draggingHue = false
@@ -1507,7 +1124,7 @@ function Library:CreateWindow(options)
                         end
                     end)
 
-                    DisplayBtn.MouseButton1Click:Connect(function() dropped = not dropped Tween(CFrame, {Size = UDim2.new(1, 0, 0, dropped and 220 or 30)}, 0.3) end)
+                    DisplayBtn.MouseButton1Click:Connect(function() dropped = not dropped Tween(CFrame, {Size = UDim2.new(1, 0, 0, dropped and 215 or 30)}, 0.3) end)
                     AddInfoIcon(CFrame, UDim2.new(1, -65, 0, 7), infoData)
 
                     Window.ConfigElements[name] = { Set = internalSet, Get = function() return color:ToHex() end }
