@@ -146,6 +146,15 @@ RunService.PostSimulation:Connect(function(deltaTime)
                     humanoid:ChangeState(Enum.HumanoidStateType[dadosAlvo.estado])
                 end
             end)
+-- [INÍCIO DA CORREÇÃO DE ANIMAÇÃO]
+            -- Simula um direcional virtual baseado na velocidade do TAS para ativar o script de animação do jogo
+            local direcaoVirtual = Vector3.new(dadosAlvo.velX, 0, dadosAlvo.velZ)
+            if direcaoVirtual.Magnitude > 0.1 then
+                humanoid:Move(direcaoVirtual.Unit, false)
+            else
+                humanoid:Move(Vector3.zero, false)
+            end
+            -- [FIM DA CORREÇÃO DE ANIMAÇÃO]
         end
     end
 end)
