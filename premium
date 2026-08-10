@@ -189,7 +189,12 @@ local RAW_URLS = {
 ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_lento.json",
 ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_rapido.json",
 ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_mais_rapido.json"
-} }
+}
+
+}
+
+}
+
 
 -- Lógica do Reprodutor de Trajeto
 local reproduzindo = false
