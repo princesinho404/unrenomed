@@ -169,17 +169,27 @@ local RAW_URLS = {
             ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%203/parkour_3_mais_rapido.json",
             ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%203/parkour_3_sem_burla.json" },
         ["Parkour 4"] = {
-            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_lento.json",
-            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_mais_rapido.json",
-            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_sem_burla.json" }
+["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_lento.json",
+["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_rapido.json",
+["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_mais_rapido.json",
+["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_sem_burla.json"
+}
 
-    }
-    },
-["Torres"] = { ["Torre 1"] = { ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_lento.json", ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_rapido.json", ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_mais_rapido.json" },
-["Torre 2"] = { ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_lento.json", ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_rapido.json", ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_mais_rapido.json"
-        }
-    }
+},
+
+["Torres"] = {
+
+["Torre 1"] = {
+["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_lento.json",
+["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_rapido.json",
+["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_mais_rapido.json"
+},
+
+["Torre 2"] = {
+["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_lento.json",
+["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_rapido.json",
+["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_mais_rapido.json"
+} }
 
 -- Lógica do Reprodutor de Trajeto
 local reproduzindo = false
