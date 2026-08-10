@@ -684,10 +684,21 @@ function Library:CreateWindow(options)
             local L_Layout = Create("UIListLayout", {Parent = LeftColumn, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)})
             local R_Layout = Create("UIListLayout", {Parent = RightColumn, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)})
             
-            -- CORREÇÃO: Espaço extra pra garantir que a rolagem chegue até as opções do final no Mobile
-            local bottomPadding = isMobile and 120 or 40
-            L_Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() PageScroll.CanvasSize = UDim2.new(0, 0, 0, math.max(L_Layout.AbsoluteContentSize.Y, R_Layout.AbsoluteContentSize.Y) + bottomPadding) end)
-            R_Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() PageScroll.CanvasSize = UDim2.new(0, 0, 0, math.max(L_Layout.AbsoluteContentSize.Y, R_Layout.AbsoluteContentSize.Y) + bottomPadding) end)
+            -- CORREÇÃO: Padding maior pro mobile e cálculos baseados no tamanho real da coluna
+            local bottomPadding = isMobile and 240 or 60
+            
+            local function UpdateScrollCanvas()
+                -- Lê o tamanho absoluto da coluna para contabilizar os cards que esticam (como o Dropdown)
+                local leftHeight = LeftColumn.AbsoluteSize.Y
+                local rightHeight = RightColumn.AbsoluteSize.Y
+                PageScroll.CanvasSize = UDim2.new(0, 0, 0, math.max(leftHeight, rightHeight) + bottomPadding)
+            end
+
+            -- Força a atualização do scroll sempre que o conteúdo ou o tamanho da coluna mudar
+            L_Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateScrollCanvas)
+            R_Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateScrollCanvas)
+            LeftColumn:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateScrollCanvas)
+            RightColumn:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateScrollCanvas)
 
             local PageObj = {Scroll = PageScroll, Btn = PageBtn, Highlight = PageHighlight, Left = true, LeftCol = LeftColumn, RightCol = RightColumn}
             table.insert(TabConfig.Pages, PageObj)
@@ -844,7 +855,7 @@ function Library:CreateWindow(options)
                     local selected = isMulti and {} or (options[1] or nil)
                     local dropped = false
                     local optionButtons = {}
-                    local maxVisible = math.min(#options, 3)
+                    local maxVisible = #options
                     local listHeight = maxVisible * 25
                     local dropOpenHeight = 50 + 32 + listHeight
                     
