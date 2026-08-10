@@ -168,32 +168,29 @@ local RAW_URLS = {
             ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%203/parkour_3_rapido.json",
             ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%203/parkour_3_mais_rapido.json",
             ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%203/parkour_3_sem_burla.json" },
-         ["Parkour 4"] = {
+        ["Parkour 4"] = {
             ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_lento.json",
             ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_rapido.json",
             ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_mais_rapido.json",
-            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_sem_burla.json"
-}
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_sem_burla.json" }
 
-},
-
+    }
+    },
     ["Torres"] = {
-
-         ["Torre 1"] = {
+        ["Torre 1"] = {
             ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_lento.json",
             ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_mais_rapido.json"
-},
-
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_mais_rapido.json",
+            ["Indisponível (4)"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre1_v2.json"
+        },
         ["Torre 2"] = {
             ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_lento.json",
             ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_mais_rapido.json"
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_mais_rapido.json",
+            ["Indisponível (4)"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre1_v2.json"
+        }
+    }
 }
-}
-}
-return RAW_URLS
-
 
 -- Lógica do Reprodutor de Trajeto
 local reproduzindo = false
@@ -397,35 +394,32 @@ for i = 1, 4 do
         executarRota("Parkours", nomeParkour, velocidadesParkour[nomeParkour])
     end)
 end
-
 -- ========================================== --
 -- Seções e Elementos de Torres na UI
 -- ========================================== --
-local opcoesTorre = {"Versão 1", "Versão 2", "Indisponível (3)", "Indisponível (4)"}
+local opcoesTorre = {"Lento", "Rápido", "Mais Rápido"}
+
 
 local T1Card = Torres_Page:CreateSection("Torre 1")
-local versaoTorre1 = "Versão 1"
+local versaoTorre1 = "Lento"
+
 T1Card:AddDropdown("Versão", opcoesTorre, false, function(v)
     versaoTorre1 = v
 end, { Title = "Selecione a Versão" })
+
 T1Card:AddButton("Iniciar Torre 1", function()
-    if versaoTorre1:match("Indisponível") then
-        Library:Notify({Title = "Aviso", Description = "Esta versão ainda não está disponível.", Duration = 3})
-        return
-    end
     executarRota("Torres", "Torre 1", versaoTorre1)
 end)
 
+
 local T2Card = Torres_Page:CreateSection("Torre 2")
-local versaoTorre2 = "Versão 1"
+local versaoTorre2 = "Lento"
+
 T2Card:AddDropdown("Versão", opcoesTorre, false, function(v)
     versaoTorre2 = v
 end, { Title = "Selecione a Versão" })
+
 T2Card:AddButton("Iniciar Torre 2", function()
-    if versaoTorre2:match("Indisponível") then
-        Library:Notify({Title = "Aviso", Description = "Esta versão ainda não está disponível.", Duration = 3})
-        return
-    end
     executarRota("Torres", "Torre 2", versaoTorre2)
 end)
 
