@@ -176,21 +176,10 @@ local RAW_URLS = {
 
     }
     },
-    ["Torres"] = {
-        ["Torre 1"] = {
-            ["Versão 1"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre1_v1.json",
-            ["Versão 2"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre1_v2.json",
-            ["Indisponível (3)"] = "",
-            ["Indisponível (4)"] = ""
-        },
-        ["Torre 2"] = {
-            ["Versão 1"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre2_v1.json",
-            ["Versão 2"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre2_v2.json",
-            ["Indisponível (3)"] = "",
-            ["Indisponível (4)"] = ""
+["Torres"] = { ["Torre 1"] = { ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_lento.json", ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_rapido.json", ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_mais_rapido.json" },
+["Torre 2"] = { ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_lento.json", ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_rapido.json", ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_mais_rapido.json"
         }
     }
-}
 
 -- Lógica do Reprodutor de Trajeto
 local reproduzindo = false
