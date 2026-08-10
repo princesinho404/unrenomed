@@ -849,10 +849,10 @@ function Library:CreateWindow(options)
                     local dropped = false
                     local optionButtons = {}
                     
-                    -- CORREÇÃO MOBILE: Altura máxima fixa para a lista não estourar a tela do celular
-                    local maxHeight = 140
-                    local calculatedListHeight = math.min(#options * 25, maxHeight)
-                    local dropOpenHeight = 50 + 32 + calculatedListHeight
+                    -- CORREÇÃO: Usa o total de opções para esticar o card completo
+                    local maxVisible = #options
+                    local listHeight = maxVisible * 25
+                    local dropOpenHeight = 50 + 32 + listHeight
                     
                     local DropFrame = Create("Frame", {Parent = ItemContainer, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 50), ClipsDescendants = true})
                     Create("TextLabel", {Parent = DropFrame, Text = name, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(1, -20, 0, 15), Position = UDim2.new(0, 10, 0, 0), TextXAlignment = Enum.TextXAlignment.Left})
@@ -867,9 +867,9 @@ function Library:CreateWindow(options)
                     local SearchBox = Create("TextBox", {Parent = DropFrame, PlaceholderText = "Search...", Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = TextColor, BackgroundColor3 = Color3.fromRGB(15, 15, 18), Size = UDim2.new(1, -20, 0, 24), Position = UDim2.new(0, 10, 0, 50), TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, Visible = false})
                     Create("UIPadding", {Parent = SearchBox, PaddingLeft = UDim.new(0, 8)})
                     Create("UICorner", {Parent = SearchBox, CornerRadius = UDim.new(0, 4)})
-                    Create("UIStroke", {Parent = SearchBox, Color = Color3.fromRGB(45, 45, 50), Thickness = 1})
+                    local SearchStroke = Create("UIStroke", {Parent = SearchBox, Color = Color3.fromRGB(45, 45, 50), Thickness = 1})
 
-                    local ListFrame = Create("ScrollingFrame", {Parent = DropFrame, BackgroundColor3 = BackgroundColor, Size = UDim2.new(1, -20, 0, calculatedListHeight), Position = UDim2.new(0, 10, 0, 78), CanvasSize = UDim2.new(0, 0, 0, #options * 25), ScrollBarThickness = 4, ScrollBarImageColor3 = Color3.fromRGB(80, 80, 85), BorderSizePixel = 0, Active = true, ScrollingEnabled = true})
+                    local ListFrame = Create("ScrollingFrame", {Parent = DropFrame, BackgroundColor3 = BackgroundColor, Size = UDim2.new(1, -20, 0, listHeight), Position = UDim2.new(0, 10, 0, 78), CanvasSize = UDim2.new(0, 0, 0, #options * 25), ScrollBarThickness = 2, ScrollBarImageColor3 = Color3.fromRGB(80, 80, 85), BorderSizePixel = 0})
                     Create("UICorner", {Parent = ListFrame, CornerRadius = UDim.new(0, 4)})
                     local DList = Create("UIListLayout", {Parent = ListFrame, SortOrder = Enum.SortOrder.LayoutOrder})
 
@@ -926,26 +926,17 @@ function Library:CreateWindow(options)
 
                     SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
                         local q = SearchBox.Text:lower()
-                        local visibleCount = 0
                         for _, btn in ipairs(optionButtons) do
-                            if q == "" or string.find(btn.Text:lower(), q) then 
-                                btn.Visible = true 
-                                visibleCount = visibleCount + 1
-                            else 
-                                btn.Visible = false 
-                            end
+                            if q == "" or string.find(btn.Text:lower(), q) then btn.Visible = true else btn.Visible = false end
                         end
-                        -- Atualiza o canvas dinamicamente ao filtrar na pesquisa mobile
-                        ListFrame.CanvasSize = UDim2.new(0, 0, 0, visibleCount * 25)
                     end)
 
                     DList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                        ListFrame.CanvasSize = UDim2.new(0, 0, 0, DList.AbsoluteContentSize.Y)
                         if dropped then
-                            local totalH = DList.AbsoluteContentSize.Y
-                            local dynamicHeight = math.min(totalH, maxHeight)
-                            ListFrame.CanvasSize = UDim2.new(0, 0, 0, totalH)
-                            ListFrame.Size = UDim2.new(1, -20, 0, dynamicHeight)
+                            local dynamicHeight = math.min(DList.AbsoluteContentSize.Y, listHeight)
                             local newOpenHeight = 50 + 32 + dynamicHeight
+                            ListFrame.Size = UDim2.new(1, -20, 0, dynamicHeight)
                             Tween(DropFrame, {Size = UDim2.new(1, 0, 0, newOpenHeight)}, 0.1)
                         end
                     end)
@@ -956,10 +947,9 @@ function Library:CreateWindow(options)
                             SearchBox.Visible = true
                             SearchBox.Text = ""
                             Tween(Arrow, {Rotation = 180}, 0.3)
-                            local totalH = DList.AbsoluteContentSize.Y
-                            local dynamicHeight = math.min(totalH, maxHeight)
-                            ListFrame.Size = UDim2.new(1, -20, 0, dynamicHeight)
+                            local dynamicHeight = math.min(DList.AbsoluteContentSize.Y, listHeight)
                             local newOpenHeight = 50 + 32 + dynamicHeight
+                            ListFrame.Size = UDim2.new(1, -20, 0, dynamicHeight)
                             Tween(DropFrame, {Size = UDim2.new(1, 0, 0, newOpenHeight)}, 0.3)
                         else
                             SearchBox.Visible = false
