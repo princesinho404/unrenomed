@@ -10,7 +10,7 @@ Library.WhitelistedUsers = {
 -- // Criação da Janela Principal
 local Window = Library:CreateWindow({
     Title = "HAVAC MENU",
-    Subtitle = "Versão Premium 1.0.2",
+    Subtitle = "Versão Premium 1.0.0",
     SubtitleColor = Color3.fromRGB(190, 140, 255),
     Logo = "rbxassetid://121574485496082",
     LogoSize = 40,
@@ -67,43 +67,128 @@ local DeltaTab = Window:CreateTab("EB do Delta", false, false)
 -- // PÁGINA: Parkours & Torres
 local Parkours_Page = DeltaTab:CreatePage("Parkours")
 local Torres_Page = DeltaTab:CreatePage("Torres")
--- Links RAW dos Trajetos
+
+-- Links RAW dos Trajetos (64 Saves Dinâmicos)
 local RAW_URLS = {
-    ["Parkour 1"] = {
-        ["Versão 1"] = "https://raw.githubusercontent.com/snooowbj/unrenomed/refs/heads/main/archiver/v10.txt",
-        ["Versão 2"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/parkour1_v2.json",
-        ["Versão 3"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/parkour1_v3.json",
-        ["Versão 4"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/parkour1_v4.json",
+    
+["Parkours"] = {
+
+    ["Grupo A"] = { -- LIDO QUANDO TIVER "Parkour1" NO WORKSPACE
+        ["Parkour 1"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%201/parkour_1_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%201/parkour_1_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%201/parkour_1_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%201/parkour_1_sem_burla.json"
+        },
+        ["Parkour 2"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%202/parkour_2_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%202/parkour_2_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%202/parkour_2_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%202/parkour_2_sem_burla.json"
+        },
+        ["Parkour 3"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%203/parkour_3_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%203/parkour_3_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%203/parkour_3_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%203/parkour_3_sem_burla.json"
+        },
+        ["Parkour 4"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%204/parkour_4_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%204/parkour_4_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%204/parkour_4_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%204/parkour_4_sem_burla.json"
+        }
     },
-    ["Parkour 2"] = {
-        ["Versão 1"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/parkour2_v1.json",
-        ["Versão 2"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/parkour2_v2.json",
-        ["Versão 3"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/parkour2_v3.json",
-        ["Versão 4"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/parkour2_v4.json",
+    ["Grupo B"] = { -- LIDO QUANDO TIVER "Parkour4" NO WORKSPACE
+        ["Parkour 1"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%201/parkour_1_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%201/parkour_1_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%201/parkour_1_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%201/parkour_1_sem_burla.json"
+        },
+        ["Parkour 2"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%202/parkour_2_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%202/parkour_2_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%202/parkour_2_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%202/parkour_2_sem_burla.json"
+        },
+        ["Parkour 3"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%203/parkour_3_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%203/parkour_3_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%203/parkour_3_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%203/parkour_3_sem_burla.json"
+        },
+        ["Parkour 4"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%204/parkour_4_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%204/parkour_4_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%204/parkour_4_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%204/parkour_4_sem_burla.json"
+        }
     },
-    ["Parkour 3"] = {
-        ["Versão 1"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/parkour3_v1.json",
-        ["Versão 2"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/parkour3_v2.json",
-        ["Versão 3"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/parkour3_v3.json",
-        ["Versão 4"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/parkour3_v4.json",
+
+    ["Grupo C"] = { -- LIDO QUANDO TIVER "Parkour3" NO WORKSPACE
+        ["Parkour 1"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%201/parkour_1_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%201/parkour_1_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%201/parkour_1_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%201/parkour_1_sem_burla.json"
+        },
+        ["Parkour 2"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%202/parkour_2_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%202/parkour_2_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%202/parkour_2_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%202/parkour_2_sem_burla.json"
+        },
+        ["Parkour 3"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%203/parkour_3_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%203/parkour_3_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%203/parkour_3_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%203/parkour_3_sem_burla.json"
+        },
+        ["Parkour 4"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%204/parkour_4_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%204/parkour_4_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%204/parkour_4_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%204/parkour_4_sem_burla.json"
+        }
     },
-    ["Parkour 4"] = {
-        ["Versão 1"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/parkour4_v1.json",
-        ["Versão 2"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/parkour4_v2.json",
-        ["Versão 3"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/parkour4_v3.json",
-        ["Versão 4"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/parkour4_v4.json",
+    ["Grupo D"] = { -- LIDO QUANDO TIVER "Parkour2" NO WORKSPACE
+        ["Parkour 1"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%201/parkour_1_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%201/parkour_1_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%201/parkour_1_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%201/parkour_1_sem_burla.json"},
+        ["Parkour 2"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%202/parkour_2_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%202/parkour_2_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%202/parkour_2_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%202/parkour_2_sem_burla.json" },
+        ["Parkour 3"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%203/parkour_3_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%203/parkour_3_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%203/parkour_3_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%203/parkour_3_sem_burla.json" },
+        ["Parkour 4"] = {
+            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_lento.json",
+            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_rapido.json",
+            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_mais_rapido.json",
+            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_sem_burla.json" }
+
+    }
     },
-    ["Torre 1"] = {
-        ["Versão 1"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre1_v1.json",
-        ["Versão 2"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre1_v2.json",
-        ["Versão 3"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre1_v3.json",
-        ["Versão 4"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre1_v4.json",
-    },
-    ["Torre 2"] = {
-        ["Versão 1"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre2_v1.json",
-        ["Versão 2"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre2_v2.json",
-        ["Versão 3"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre2_v3.json",
-        ["Versão 4"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre2_v4.json",
+    ["Torres"] = {
+        ["Torre 1"] = {
+            ["Versão 1"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre1_v1.json",
+            ["Versão 2"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre1_v2.json",
+            ["Indisponível (3)"] = "",
+            ["Indisponível (4)"] = ""
+        },
+        ["Torre 2"] = {
+            ["Versão 1"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre2_v1.json",
+            ["Versão 2"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre2_v2.json",
+            ["Indisponível (3)"] = "",
+            ["Indisponível (4)"] = ""
+        }
     }
 }
 
@@ -118,7 +203,9 @@ RunService.PostSimulation:Connect(function(deltaTime)
         tempoDecorrido = tempoDecorrido + deltaTime
         local historico = slotAtivo.dados
         
-        local dadosAlvo = nil
+        -- Puxa o primeiro frame como salvaguarda
+        local dadosAlvo = historico[1] 
+        
         for i = #historico, 1, -1 do
             if historico[i].tempo <= tempoDecorrido then
                 dadosAlvo = historico[i]
@@ -126,7 +213,11 @@ RunService.PostSimulation:Connect(function(deltaTime)
             end
         end
         
-        if tempoDecorrido >= (slotAtivo.tempoTotal or 9999) or not dadosAlvo then
+        -- Calcula o tempo limite (usa tempoTotal, se não tiver, usa o tempo da última posição gravada)
+        local tempoLimite = slotAtivo.tempoTotal or historico[#historico].tempo
+        
+        -- Só finaliza se realmente passou do tempo final
+        if tempoDecorrido >= tempoLimite then
             reproduzindo = false
             humanoid.PlatformStand = false
             slotAtivo = nil
@@ -146,15 +237,6 @@ RunService.PostSimulation:Connect(function(deltaTime)
                     humanoid:ChangeState(Enum.HumanoidStateType[dadosAlvo.estado])
                 end
             end)
--- [INÍCIO DA CORREÇÃO DE ANIMAÇÃO]
-            -- Simula um direcional virtual baseado na velocidade do TAS para ativar o script de animação do jogo
-            local direcaoVirtual = Vector3.new(dadosAlvo.velX, 0, dadosAlvo.velZ)
-            if direcaoVirtual.Magnitude > 0.1 then
-                humanoid:Move(direcaoVirtual.Unit, false)
-            else
-                humanoid:Move(Vector3.zero, false)
-            end
-            -- [FIM DA CORREÇÃO DE ANIMAÇÃO]
         end
     end
 end)
@@ -226,10 +308,40 @@ local function iniciarTrajetoHavac(dadosDoTrajeto)
     end
 end
 
-local function executarRotaPorURL(nomeCategoria, versao)
-    local url = RAW_URLS[nomeCategoria] and RAW_URLS[nomeCategoria][versao]
+-- ========================================== --
+-- FUNÇÕES DE LEITURA DO WORKSPACE E EXECUÇÃO
+-- ========================================== --
+
+-- Verifica qual grupo de parkour está no workspace
+local function getGrupoAtivo()
+    local parkoursFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Parkours")
+    if not parkoursFolder then return nil end
+
+    if parkoursFolder:FindFirstChild("Parkour1") then return "Grupo A" end
+    if parkoursFolder:FindFirstChild("Parkour4") then return "Grupo B" end
+    if parkoursFolder:FindFirstChild("Parkour3") then return "Grupo C" end
+    if parkoursFolder:FindFirstChild("Parkour2") then return "Grupo D" end
+    
+    return nil
+end
+
+local function executarRota(categoria, identifier, versao)
+    local url = ""
+    
+    if categoria == "Parkours" then
+        local grupoAtivo = getGrupoAtivo()
+        if not grupoAtivo then
+            Library:Notify({Title = "Erro", Description = "Nenhum mapa de parkour detectado no Workspace.", Duration = 3})
+            return
+        end
+        url = RAW_URLS["Parkours"][grupoAtivo][identifier][versao]
+        Library:Notify({Title = "Mapa Detectado", Description = "Carregando rotas do " .. grupoAtivo, Duration = 2})
+    else
+        url = RAW_URLS["Torres"][identifier][versao]
+    end
+
     if not url or url == "" or url:sub(1, 4) ~= "http" then
-        Library:Notify({Title = "Erro", Description = "URL RAW não configurada para " .. nomeCategoria .. " (" .. versao .. ")", Duration = 3})
+        Library:Notify({Title = "Erro", Description = "URL RAW não configurada para esta versão.", Duration = 3})
         return
     end
 
@@ -246,7 +358,7 @@ local function executarRotaPorURL(nomeCategoria, versao)
             end)
 
             if jsonSucesso and dadosSlot then
-                if dadosSlot[1] and dadosSlot[1].dados then
+                if type(dadosSlot) == "table" and dadosSlot[1] and dadosSlot[1].dados then
                     dadosSlot = dadosSlot[1]
                 end
                 iniciarTrajetoHavac(dadosSlot)
@@ -259,60 +371,59 @@ local function executarRotaPorURL(nomeCategoria, versao)
     end)
 end
 
--- Seções e Elementos de Parkour na UI
-local P1Card = Parkours_Page:CreateSection("Parkour 1")
-local versaoParkour1 = "Versão 1"
-P1Card:AddDropdown("Versão", {"Versão 1", "Versão 2", "Versão 3", "Versão 4"}, false, function(v)
-    versaoParkour1 = v
-end, { Title = "Selecione a Versão" })
-P1Card:AddButton("Iniciar Parkour 1", function()
-    executarRotaPorURL("Parkour 1", versaoParkour1)
-end)
+-- ========================================== --
+-- Seções e Elementos de Parkour na UI (APENAS 4 CARDS)
+-- ========================================== --
+local listaVersoes = {"Lento", "Rápido", "Mais Rápido", "Sem Burla"}
+local velocidadesParkour = {
+    ["Parkour 1"] = "Lento",
+    ["Parkour 2"] = "Lento",
+    ["Parkour 3"] = "Lento",
+    ["Parkour 4"] = "Lento"
+}
 
-local P2Card = Parkours_Page:CreateSection("Parkour 2")
-local versaoParkour2 = "Versão 1"
-P2Card:AddDropdown("Versão", {"Versão 1", "Versão 2", "Versão 3", "Versão 4"}, false, function(v)
-    versaoParkour2 = v
-end, { Title = "Selecione a Versão" })
-P2Card:AddButton("Iniciar Parkour 2", function()
-    executarRotaPorURL("Parkour 2", versaoParkour2)
-end)
+for i = 1, 4 do
+    local nomeParkour = "Parkour " .. i
+    local Section = Parkours_Page:CreateSection(nomeParkour)
+    
+    Section:AddDropdown("Velocidade", listaVersoes, false, function(v)
+        velocidadesParkour[nomeParkour] = v
+    end, { Title = "Estilo/Velocidade" })
+    
+    Section:AddButton("Iniciar " .. nomeParkour, function()
+        executarRota("Parkours", nomeParkour, velocidadesParkour[nomeParkour])
+    end)
+end
 
-local P3Card = Parkours_Page:CreateSection("Parkour 3")
-local versaoParkour3 = "Versão 1"
-P3Card:AddDropdown("Versão", {"Versão 1", "Versão 2", "Versão 3", "Versão 4"}, false, function(v)
-    versaoParkour3 = v
-end, { Title = "Selecione a Versão" })
-P3Card:AddButton("Iniciar Parkour 3", function()
-    executarRotaPorURL("Parkour 3", versaoParkour3)
-end)
-
-local P4Card = Parkours_Page:CreateSection("Parkour 4")
-local versaoParkour4 = "Versão 1"
-P4Card:AddDropdown("Versão", {"Versão 1", "Versão 2", "Versão 3", "Versão 4"}, false, function(v)
-    versaoParkour4 = v
-end, { Title = "Selecione a Versão" })
-P4Card:AddButton("Iniciar Parkour 4", function()
-    executarRotaPorURL("Parkour 4", versaoParkour4)
-end)
-
+-- ========================================== --
 -- Seções e Elementos de Torres na UI
+-- ========================================== --
+local opcoesTorre = {"Versão 1", "Versão 2", "Indisponível (3)", "Indisponível (4)"}
+
 local T1Card = Torres_Page:CreateSection("Torre 1")
 local versaoTorre1 = "Versão 1"
-T1Card:AddDropdown("Versão", {"Versão 1", "Versão 2", "Versão 3", "Versão 4"}, false, function(v)
+T1Card:AddDropdown("Versão", opcoesTorre, false, function(v)
     versaoTorre1 = v
 end, { Title = "Selecione a Versão" })
 T1Card:AddButton("Iniciar Torre 1", function()
-    executarRotaPorURL("Torre 1", versaoTorre1)
+    if versaoTorre1:match("Indisponível") then
+        Library:Notify({Title = "Aviso", Description = "Esta versão ainda não está disponível.", Duration = 3})
+        return
+    end
+    executarRota("Torres", "Torre 1", versaoTorre1)
 end)
 
 local T2Card = Torres_Page:CreateSection("Torre 2")
 local versaoTorre2 = "Versão 1"
-T2Card:AddDropdown("Versão", {"Versão 1", "Versão 2", "Versão 3", "Versão 4"}, false, function(v)
+T2Card:AddDropdown("Versão", opcoesTorre, false, function(v)
     versaoTorre2 = v
 end, { Title = "Selecione a Versão" })
 T2Card:AddButton("Iniciar Torre 2", function()
-    executarRotaPorURL("Torre 2", versaoTorre2)
+    if versaoTorre2:match("Indisponível") then
+        Library:Notify({Title = "Aviso", Description = "Esta versão ainda não está disponível.", Duration = 3})
+        return
+    end
+    executarRota("Torres", "Torre 2", versaoTorre2)
 end)
 
 -- // PÁGINA: Havac (Automações)
@@ -1118,30 +1229,86 @@ local function iniciarPlayback(slot)
     local targetCF = CFrame.new(posAlvoExata) * CFrame.fromEulerAnglesYXZ(0, pPrimeiro.rotY, 0)
     local dist = (rootPart.Position - posAlvoExata).Magnitude
 
-    if configSecurity and dist > 50 then
-        Library:Notify({Title = "Segurança", Description = "Muito longe. Cancelado!", Duration = 3}); slotAtivo = nil; return
-    end
-
-    local velAtual = humanoid.WalkSpeed; humanoid.WalkSpeed = 16
-    if dist > 1.2 and dist < 35 then
-        humanoid:MoveTo(posAlvoExata - Vector3.new(0, (humanoid and humanoid.HipHeight) and (humanoid.HipHeight + (rootPart.Size.Y / 2)) or 3.0, 0))
-        local t0 = os.clock()
-        while (Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z) - Vector3.new(posAlvoExata.X, 0, posAlvoExata.Z)).Magnitude > 1.2 and (os.clock() - t0) < 2.5 do task.wait() end
-        humanoid:MoveTo(rootPart.Position)
-        rootPart.AssemblyLinearVelocity, rootPart.AssemblyAngularVelocity, humanoid.AutoRotate = Vector3.zero, Vector3.zero, false
-        TweenService:Create(rootPart, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = targetCF}):Play()
-        task.wait(0.2); humanoid.AutoRotate = true
+    -- ==========================================
+    -- 👻 LÓGICA DO TOGGLE MOVETO (DUMMY FANTASMA)
+    -- ==========================================
+    if configSecurity then
+        -- Se o toggle estiver ATIVADO: Vai direto de forma automatizada (seu comportamento antigo)
+        local velAtual = humanoid.WalkSpeed; humanoid.WalkSpeed = 16
+        if dist > 1.2 and dist < 35 then
+            humanoid:MoveTo(posAlvoExata - Vector3.new(0, (humanoid and humanoid.HipHeight) and (humanoid.HipHeight + (rootPart.Size.Y / 2)) or 3.0, 0))
+            local t0 = os.clock()
+            while (Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z) - Vector3.new(posAlvoExata.X, 0, posAlvoExata.Z)).Magnitude > 1.2 and (os.clock() - t0) < 2.5 do task.wait() end
+            humanoid:MoveTo(rootPart.Position)
+            rootPart.AssemblyLinearVelocity, rootPart.AssemblyAngularVelocity, humanoid.AutoRotate = Vector3.zero, Vector3.zero
+            TweenService:Create(rootPart, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = targetCF}):Play()
+            task.wait(0.2); humanoid.AutoRotate = true
+        else
+            character:PivotTo(targetCF)
+        end
+        humanoid.WalkSpeed = velAtual
     else
-        character:PivotTo(targetCF)
+        -- Se o toggle estiver DESATIVADO: Cria o Dummy Fantasma com Highlight visível através de tudo
+        Library:Notify({Title = "TAS", Description = "Vá até o ponto verde brilhante!", Duration = 3})
+        
+        local dummy = Instance.new("Part")
+        dummy.Size = Vector3.new(4, 5, 4)
+        dummy.Position = posAlvoExata
+        dummy.Anchored = true
+        dummy.CanCollide = false
+        dummy.Transparency = 0.5
+        dummy.Color = Color3.fromRGB(0, 255, 150)
+        dummy.Material = Enum.Material.Neon
+        dummy.Parent = workspace
+
+        local highlight = Instance.new("Highlight")
+        highlight.Parent = dummy
+        highlight.FillColor = dummy.Color
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.FillTransparency = 0.4
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- Brilha através das paredes
+
+        local conectado
+        local chegou = false
+        
+        conectado = RunService.Heartbeat:Connect(function()
+            if not character or not rootPart or not reproduzindo and slotAtivo == nil then 
+                if conectado then conectado:Disconnect() end
+                if dummy then dummy:Destroy() end
+                return
+            end
+            
+            local d = (rootPart.Position - dummy.Position).Magnitude
+            if d <= 3.5 and not chegou then
+                chegou = true
+                conectado:Disconnect()
+                
+                -- Ativa secretamente o MoveTo final bem pertinho para encaixar perfeitamente de forma legit
+                local velAtual = humanoid.WalkSpeed; humanoid.WalkSpeed = 16
+                humanoid:MoveTo(posAlvoExata)
+                task.wait(0.15)
+                character:PivotTo(targetCF)
+                humanoid.WalkSpeed = velAtual
+                
+                dummy:Destroy()
+                
+                if delayInicio > 0 then task.wait(delayInicio) end
+                task.defer(function() reproduzindo = true end)
+                Library:Notify({Title = "TAS", Description = "Reproduzindo Rota!", Duration = 3})
+            end
+        end)
+        
+        -- Interrompe a execução imediata para aguardar o player encostar no dummy
+        return
     end
-    humanoid.WalkSpeed = velAtual
+    -- ==========================================
+
     rootPart.AssemblyLinearVelocity, rootPart.AssemblyAngularVelocity = Vector3.zero, Vector3.zero
 
     if delayInicio > 0 then task.wait(delayInicio) end
     task.defer(function() reproduzindo = true end)
     Library:Notify({Title = "TAS", Description = "Reproduzindo Rota!", Duration = 3})
 end
-
 --------------------------------------------------------------------
 -- 🎥 TAB 4: TAS (Rica em Funções)
 --------------------------------------------------------------------
