@@ -1,5 +1,4 @@
--- // ZyronX UI Library (Core Engine) - Optimized for Zero Lag Loops
--- // Modificações: Escala Mobile, RGB Input no ColorPicker e Toggle K, Correção de Scroll Mobile
+-- // ZyronX UI Library (Core Engine) - Optimized for Zero Lag Loops & Fixed Memory Leaks
 
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -101,11 +100,12 @@ local function AddBounce(button, scaleFactor)
     end)
 end
 
--- // Utility: Draggable
+-- // Utility: Draggable (Fixed Memory Leak)
 local function MakeDraggable(topbar, object)
     topbar.Active = true
     object.Active = true
     local dragging, dragInput, dragStart, startPos
+    local dragEndConnection
     
     topbar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -113,9 +113,14 @@ local function MakeDraggable(topbar, object)
             dragStart = input.Position
             startPos = object.Position
             
-            input.Changed:Connect(function()
+            if dragEndConnection then dragEndConnection:Disconnect() end
+            dragEndConnection = input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
+                    if dragEndConnection then
+                        dragEndConnection:Disconnect()
+                        dragEndConnection = nil
+                    end
                 end
             end)
         end
@@ -217,53 +222,14 @@ function Library:CreateWindow(options)
         IgnoreGuiInset = true
     })
 
-    -- // CONFIGURAÇÃO DO BOTÃO MOBILE / ATALHO
-    local botaoinv = 0.5 -- 0.5 = Semi-transparente (para testes) | 1 = 100% Invisível | 0 = Visível
-
-    -- ScreenGui separado para o botão continuar clicável mesmo quando a UI principal for ocultada
-    local ToggleGui = Create("ScreenGui", {
-        Name = "ZyronX_Toggle_" .. uniqueID,
-        Parent = RunService:IsStudio() and game.Players.LocalPlayer:WaitForChild("PlayerGui") or CoreGui,
-        ResetOnSpawn = false,
-        IgnoreGuiInset = true
-    })
-
-    -- Botão fixo no Canto Superior Direito da Tela
-    local MobileToggleBtn = Create("TextButton", {
-        Parent = ToggleGui,
-        Name = "MobileToggleBtn",
-        Size = UDim2.new(0, 45, 0, 45),
-        Position = UDim2.new(1, -55, 0, 10), -- 55px da borda direita, 10px do topo
-        BackgroundColor3 = Color3.fromRGB(20, 20, 25),
-        BackgroundTransparency = botaoinv,
-        Text = (botaoinv >= 1) and "" or "K", -- Exibe "K" para você saber onde ele está enquanto testa
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        TextTransparency = botaoinv,
-        Font = Enum.Font.GothamBold,
-        TextSize = 14,
-        ZIndex = 9999,
-        Active = true
-    })
-    Create("UICorner", {Parent = MobileToggleBtn, CornerRadius = UDim.new(0, 8)})
-
-    -- Função unificada para abrir/fechar a UI (usada tanto pelo teclado quanto pelo botão mobile)
+    -- Toggle K
     local isUIHidden = false
-    local function ToggleUI()
-        isUIHidden = not isUIHidden
-        ScreenGui.Enabled = not isUIHidden
-    end
-
-    -- Tecla K no teclado
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.KeyCode == Enum.KeyCode.K then
-            ToggleUI()
+            isUIHidden = not isUIHidden
+            ScreenGui.Enabled = not isUIHidden
         end
-    end)
-
-    -- Clique / Toque no Botão Mobile
-    MobileToggleBtn.MouseButton1Click:Connect(function()
-        ToggleUI()
     end)
 
     local NotifContainer = Create("Frame", {
@@ -330,7 +296,7 @@ function Library:CreateWindow(options)
     local InfoExampleText = Create("TextLabel", {Parent = InfoExampleBox, Text = "", Font = Enum.Font.Code, TextSize = 12, TextColor3 = AccentColor, BackgroundTransparency = 1, Size = UDim2.new(1, -20, 0, 0), Position = UDim2.new(0, 10, 0, 10), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, AutomaticSize = Enum.AutomaticSize.Y, ZIndex = 152, TextTransparency = 1})
     Create("UIPadding", {Parent = InfoExampleBox, PaddingBottom = UDim.new(0, 10)})
 
-    InfoLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() InfoScroll.CanvasSize = UDim2.new(0, 0, 0, InfoLayout.AbsoluteContentSize.Y + 20) end)
+    InfoLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() InfoScroll.CanvasSize = UDim2.new(0, 0, 0, InfoLayout.AbsoluteContentSize.Y + 10) end)
 
     local function OpenInfoWindow(data)
         InfoTitle.Text = data.Title or "Information"
@@ -381,6 +347,8 @@ function Library:CreateWindow(options)
     Create("UIStroke", {Parent = MainFrame, Color = Color3.fromRGB(40, 40, 45), Thickness = 1})
     Tween(MainScale, {Scale = BASE_SCALE}, 0.5)
     Tween(MainFrame, {BackgroundTransparency = 0}, 0.5)
+
+    -- // CORE ENGINE ADDITION: Floating Bottom Bar Natively Attached to ScreenGui
     
     local BottomDragHitbox = Create("Frame", {
         Parent = ScreenGui,
@@ -409,8 +377,7 @@ function Library:CreateWindow(options)
 
     MakeDraggable(BottomDragHitbox, MainFrame)
 
-    -- Função isolada que só recalcula as coisas quando chamada
-    local function UpdateBottomBar()
+    RunService.RenderStepped:Connect(function()
         if MainFrame and MainFrame.Visible then
             BottomDragHitbox.Visible = true
             local currentScale = MainScale.Scale
@@ -429,15 +396,7 @@ function Library:CreateWindow(options)
         else
             BottomDragHitbox.Visible = false
         end
-    end
-
-    -- Escuta ativamente as propriedades. Só gasta processamento SE essas propriedades mudarem!
-    MainFrame:GetPropertyChangedSignal("Position"):Connect(UpdateBottomBar)
-    MainFrame:GetPropertyChangedSignal("Visible"):Connect(UpdateBottomBar)
-    MainScale:GetPropertyChangedSignal("Scale"):Connect(UpdateBottomBar)
-    
-    -- Chama uma vez ao criar a UI para alinhar tudo
-    UpdateBottomBar()
+    end)
 
     local TopBar = Create("Frame", {Parent = MainFrame, BackgroundColor3 = BackgroundColor, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 0, 0), Active = true})
     MakeDraggable(TopBar, MainFrame)
@@ -474,12 +433,7 @@ function Library:CreateWindow(options)
     local TabSearchStroke = Create("UIStroke", {Parent = TabSearchBox, Color = Color3.fromRGB(45, 45, 50), Thickness = 1})
     
     local TabContainer = Create("ScrollingFrame", {Parent = Sidebar, BackgroundTransparency = 1, Size = UDim2.new(1, -15, 1, -40), Position = UDim2.new(0, 10, 0, 40), ScrollBarThickness = 0})
-    -- CORREÇÃO: Abas agora atualizam o scroll dinamicamente
-    local TabListLayout = Create("UIListLayout", {Parent = TabContainer, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5)})
-    TabListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        TabContainer.CanvasSize = UDim2.new(0, 0, 0, TabListLayout.AbsoluteContentSize.Y + 30)
-    end)
-    
+    Create("UIListLayout", {Parent = TabContainer, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5)})
     local Divider = Create("Frame", {Parent = MainFrame, BackgroundColor3 = Color3.fromRGB(40, 40, 45), BorderSizePixel = 0, Size = UDim2.new(0, 1, 1, -40), Position = UDim2.new(0, 160, 0, 40)})
 
     local ContentArea = Create("Frame", {Parent = MainFrame, BackgroundTransparency = 1, Size = UDim2.new(1, -165, 1, -40), Position = UDim2.new(0, 165, 0, 40), Active = true})
@@ -542,7 +496,7 @@ function Library:CreateWindow(options)
     local PopupScale = Create("UIScale", {Parent = PopupCard, Scale = 0.8})
     local PopupStroke = Create("UIStroke", {Parent = PopupCard, Color = Color3.fromRGB(50, 50, 55), Thickness = 1, Transparency = 1})
     local PopupTitle = Create("TextLabel", {Parent = PopupCard, Text = "Exit Application", Font = Enum.Font.GothamBold, TextSize = 18, TextColor3 = TextColor, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30), Position = UDim2.new(0, 0, 0, 25), ZIndex = 102, TextTransparency = 1, TextXAlignment = Enum.TextXAlignment.Center})
-    local PopupText = Create("TextLabel", {Parent = PopupCard, Text = "Are you sure you want to close ZyronX? Unsaved configurations might be lost.", Font = Enum.Font.Gotham, TextSize = 13, TextColor3 = SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(1, -40, 0, 40), Position = UDim2.new(0, 20, 0, 55), ZIndex = 102, TextTransparency = 1, TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = true})
+    local PopupText = Create("TextLabel", {Parent = PopupCard, Text = "Are you sure you want to close ZyronX?\nUnsaved configurations might be lost.", Font = Enum.Font.Gotham, TextSize = 13, TextColor3 = SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(1, -40, 0, 40), Position = UDim2.new(0, 20, 0, 55), ZIndex = 102, TextTransparency = 1, TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = true})
     local YesBtn = Create("TextButton", {Parent = PopupCard, Text = "Confirm", Font = Enum.Font.GothamBold, TextSize = 13, TextColor3 = Color3.fromRGB(255, 255, 255), BackgroundColor3 = AccentColor, Size = UDim2.new(0, 125, 0, 36), Position = UDim2.new(0.5, 10, 0, 105), ZIndex = 102, BackgroundTransparency = 1, TextTransparency = 1, AutoButtonColor = false})
     Create("UICorner", {Parent = YesBtn, CornerRadius = UDim.new(0, 6)})
     AddBounce(YesBtn)
@@ -621,7 +575,7 @@ function Library:CreateWindow(options)
             local activeLeft = Window.CurrentTab.CurrentPage.LeftCol
             local activeRight = Window.CurrentTab.CurrentPage.RightCol
             local placeLeft = true
-            
+             
             for _, data in ipairs(Window.AllCards) do
                 local card = data.Card
                 if data.Tab == Window.CurrentTab then
@@ -725,17 +679,25 @@ function Library:CreateWindow(options)
             local PageHighlight = Create("Frame", {Parent = PageBtn, BackgroundColor3 = AccentColor, Size = UDim2.new(0, 0, 0, 2), Position = UDim2.new(0.5, 0, 1, -5), AnchorPoint = Vector2.new(0.5, 0), BackgroundTransparency = 1})
             local PageScroll = Create("ScrollingFrame", {Parent = PageContainer, BackgroundTransparency = 1, Size = UDim2.new(1, -10, 1, -10), Position = UDim2.new(0, 5, 0, 5), ScrollBarThickness = 2, ScrollBarImageColor3 = Color3.fromRGB(60, 60, 65), Visible = false, BorderSizePixel = 0})
 
-            -- CORREÇÃO: Colunas agora tem AutomaticSize pra não cortar conteúdo
-            local LeftColumn = Create("Frame", {Parent = PageScroll, BackgroundTransparency = 1, Size = UDim2.new(0.5, -5, 1, 0), AutomaticSize = Enum.AutomaticSize.Y})
-            local RightColumn = Create("Frame", {Parent = PageScroll, BackgroundTransparency = 1, Size = UDim2.new(0.5, -5, 1, 0), Position = UDim2.new(0.5, 5, 0, 0), AutomaticSize = Enum.AutomaticSize.Y})
+            local LeftColumn = Create("Frame", {Parent = PageScroll, BackgroundTransparency = 1, Size = UDim2.new(0.5, -5, 1, 0)})
+            local RightColumn = Create("Frame", {Parent = PageScroll, BackgroundTransparency = 1, Size = UDim2.new(0.5, -5, 1, 0), Position = UDim2.new(0.5, 5, 0, 0)})
             
             local L_Layout = Create("UIListLayout", {Parent = LeftColumn, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)})
             local R_Layout = Create("UIListLayout", {Parent = RightColumn, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)})
             
-            -- CORREÇÃO: Espaço extra pra garantir que a rolagem chegue até as opções do final no Mobile
-            local bottomPadding = isMobile and 120 or 40
-            L_Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() PageScroll.CanvasSize = UDim2.new(0, 0, 0, math.max(L_Layout.AbsoluteContentSize.Y, R_Layout.AbsoluteContentSize.Y) + bottomPadding) end)
-            R_Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() PageScroll.CanvasSize = UDim2.new(0, 0, 0, math.max(L_Layout.AbsoluteContentSize.Y, R_Layout.AbsoluteContentSize.Y) + bottomPadding) end)
+            -- CORREÇÃO: Padding maior pro mobile e cálculos baseados no tamanho real da coluna
+            local bottomPadding = isMobile and 240 or 60
+            
+            local function UpdateScrollCanvas()
+                local leftHeight = LeftColumn.AbsoluteSize.Y
+                local rightHeight = RightColumn.AbsoluteSize.Y
+                PageScroll.CanvasSize = UDim2.new(0, 0, 0, math.max(leftHeight, rightHeight) + bottomPadding)
+            end
+
+            L_Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateScrollCanvas)
+            R_Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateScrollCanvas)
+            LeftColumn:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateScrollCanvas)
+            RightColumn:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateScrollCanvas)
 
             local PageObj = {Scroll = PageScroll, Btn = PageBtn, Highlight = PageHighlight, Left = true, LeftCol = LeftColumn, RightCol = RightColumn}
             table.insert(TabConfig.Pages, PageObj)
@@ -769,7 +731,7 @@ function Library:CreateWindow(options)
                 local targetColumn = PageObj.Left and LeftColumn or RightColumn
                 PageObj.Left = not PageObj.Left
 
-                local SectionContainer = Create("Frame", {Parent = targetColumn, BackgroundColor3 = CardColor, Size = UDim2.new(1, 0, 0, 30), AutomaticSize = Enum.AutomaticSize.Y, ClipsDescendants = true})
+                local SectionContainer = Create("Frame", {Parent = targetColumn, BackgroundColor3 = CardColor, Size = UDim2.new(1, 0, 0, 30), AutomaticSize = Enum.AutomaticSize.Y, ClipsDescendants = false}) -- False para o Dropdown ZIndex funcionar
                 Create("UICorner", {Parent = SectionContainer, CornerRadius = UDim.new(0, 6)})
                 
                 table.insert(Window.AllCards, {
@@ -875,14 +837,35 @@ function Library:CreateWindow(options)
                     end
 
                     local dragging = false
+                    local moveConnection, endConnection
+
                     local function Update(input)
                         local pos = math.clamp((input.Position.X - TrackBase.AbsolutePosition.X) / TrackBase.AbsoluteSize.X, 0, 1)
                         internalSet(math.floor(min + ((max - min) * pos)))
                     end
 
-                    Knob.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true end end)
-                    UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end end)
-                    UserInputService.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then Update(input) end end)
+                    Knob.InputBegan:Connect(function(input) 
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+                            dragging = true 
+                            
+                            if moveConnection then moveConnection:Disconnect() end
+                            if endConnection then endConnection:Disconnect() end
+
+                            moveConnection = UserInputService.InputChanged:Connect(function(moveInput)
+                                if dragging and (moveInput.UserInputType == Enum.UserInputType.MouseMovement or moveInput.UserInputType == Enum.UserInputType.Touch) then
+                                    Update(moveInput)
+                                end
+                            end)
+
+                            endConnection = UserInputService.InputEnded:Connect(function(endInput)
+                                if endInput.UserInputType == Enum.UserInputType.MouseButton1 or endInput.UserInputType == Enum.UserInputType.Touch then
+                                    dragging = false
+                                    if moveConnection then moveConnection:Disconnect() end
+                                    if endConnection then endConnection:Disconnect() end
+                                end
+                            end)
+                        end 
+                    end)
                     AddInfoIcon(SliFrame, UDim2.new(1, -65, 0, 0), infoData)
 
                     Window.ConfigElements[name] = { Set = internalSet, Get = function() return val end }
@@ -892,43 +875,26 @@ function Library:CreateWindow(options)
                     local selected = isMulti and {} or (options[1] or nil)
                     local dropped = false
                     local optionButtons = {}
-                    local maxVisible = math.min(#options, 8)
-                    local listHeight = maxVisible * 25
-                    local dropOpenHeight = 50 + 32 + listHeight
                     
-                    local DropFrame = Create("Frame", {Parent = ItemContainer, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 50), ClipsDescendants = true})
-                    Create("TextLabel", {Parent = DropFrame, Text = name, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(1, -20, 0, 15), Position = UDim2.new(0, 10, 0, 0), TextXAlignment = Enum.TextXAlignment.Left})
+                    local DropFrame = Create("Frame", {Parent = ItemContainer, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 50), ZIndex = 10, ClipsDescendants = true})
+                    Create("TextLabel", {Parent = DropFrame, Text = name, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(1, -20, 0, 15), Position = UDim2.new(0, 10, 0, 0), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 10})
                     
-                    local MainBtn = Create("TextButton", {Parent = DropFrame, Text = isMulti and "Select Options..." or "Select...", Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = TextColor, BackgroundColor3 = BackgroundColor, Size = UDim2.new(1, -20, 0, 26), Position = UDim2.new(0, 10, 0, 20), AutoButtonColor = false, TextXAlignment = Enum.TextXAlignment.Left})
+                    local MainBtn = Create("TextButton", {Parent = DropFrame, Text = "Select...", Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = TextColor, BackgroundColor3 = BackgroundColor, Size = UDim2.new(1, -20, 0, 26), Position = UDim2.new(0, 10, 0, 20), AutoButtonColor = false, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 11})
                     Create("UIPadding", {Parent = MainBtn, PaddingLeft = UDim.new(0, 8)})
                     Create("UICorner", {Parent = MainBtn, CornerRadius = UDim.new(0, 4)})
                     Create("UIStroke", {Parent = MainBtn, Color = Color3.fromRGB(45, 45, 50), Thickness = 1})
                     AddBounce(MainBtn, 0.98)
-                    local Arrow = Create("TextLabel", {Parent = MainBtn, Text = "▼", Font = Enum.Font.Gotham, TextSize = 10, TextColor3 = SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(0, 20, 1, 0), Position = UDim2.new(1, -28, 0, 0)})
-
-                    local SearchBox = Create("TextBox", {Parent = DropFrame, PlaceholderText = "Search...", Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = TextColor, BackgroundColor3 = Color3.fromRGB(15, 15, 18), Size = UDim2.new(1, -20, 0, 24), Position = UDim2.new(0, 10, 0, 50), TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, Visible = false})
+                    local Arrow = Create("TextLabel", {Parent = MainBtn, Text = "▼", Font = Enum.Font.Gotham, TextSize = 10, TextColor3 = SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(0, 20, 1, 0), Position = UDim2.new(1, -28, 0, 0), ZIndex = 11})
+                    
+                    local SearchBox = Create("TextBox", {Parent = DropFrame, PlaceholderText = "Search...", Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = TextColor, BackgroundColor3 = Color3.fromRGB(15, 15, 18), Size = UDim2.new(1, -20, 0, 24), Position = UDim2.new(0, 10, 0, 50), TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, Visible = false, ZIndex = 12})
                     Create("UIPadding", {Parent = SearchBox, PaddingLeft = UDim.new(0, 8)})
                     Create("UICorner", {Parent = SearchBox, CornerRadius = UDim.new(0, 4)})
-                    local SearchStroke = Create("UIStroke", {Parent = SearchBox, Color = Color3.fromRGB(45, 45, 50), Thickness = 1})
+                    Create("UIStroke", {Parent = SearchBox, Color = Color3.fromRGB(45, 45, 50), Thickness = 1})
 
-                    local ListFrame = Create("ScrollingFrame", {Parent = DropFrame, BackgroundColor3 = BackgroundColor, Size = UDim2.new(1, -20, 0, listHeight), Position = UDim2.new(0, 10, 0, 78), CanvasSize = UDim2.new(0, 0, 0, #options * 25), ScrollBarThickness = 2, ScrollBarImageColor3 = Color3.fromRGB(80, 80, 85), BorderSizePixel = 0})
+                    local ListFrame = Create("ScrollingFrame", {Parent = DropFrame, BackgroundColor3 = BackgroundColor, Size = UDim2.new(1, -20, 0, 0), Position = UDim2.new(0, 10, 0, 78), CanvasSize = UDim2.new(0, 0, 0, 0), ScrollBarThickness = 2, ScrollBarImageColor3 = Color3.fromRGB(80, 80, 85), BorderSizePixel = 0, ZIndex = 12})
                     Create("UICorner", {Parent = ListFrame, CornerRadius = UDim.new(0, 4)})
                     local DList = Create("UIListLayout", {Parent = ListFrame, SortOrder = Enum.SortOrder.LayoutOrder})
-                    ListFrame.InputBegan:Connect(function(input)
-                        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-                            if PageObj and PageObj.Scroll then
-                                PageObj.Scroll.ScrollingEnabled = false
-                            end
-                        end
-                    end)
 
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        if PageObj and PageObj.Scroll then
-            PageObj.Scroll.ScrollingEnabled = true
-        end
-    end
-end)
                     local function UpdateText()
                         if isMulti then
                             local txt = ""
@@ -943,105 +909,26 @@ end)
                         selected = v
                         UpdateText()
                         for _, btn in ipairs(optionButtons) do
-                            local isSel = false
-                            if isMulti then
-                                isSel = table.find(selected, btn.Text) ~= nil
-                            else
-                                isSel = (selected == btn.Text)
-                            end
+                            local isSel = (isMulti and table.find(selected, btn.Text) ~= nil) or (not isMulti and selected == btn.Text)
                             Tween(btn, {TextColor3 = isSel and TextColor or SubTextColor}, 0.2)
                             Tween(btn:FindFirstChild("Frame"), {Size = isSel and UDim2.new(1, 0, 1, 0) or UDim2.new(0, 0, 1, 0)}, 0.2)
                         end
                         if callback then callback(selected) end
                     end
 
-                    for _, opt in pairs(options) do
-                        local isInitialSelected = (not isMulti and selected == opt)
-                        local OptBtn = Create("TextButton", {Parent = ListFrame, Text = opt, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = isInitialSelected and TextColor or SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 25), AutoButtonColor = false})
-                        local Check = Create("Frame", {Parent = OptBtn, BackgroundColor3 = AccentColor, Size = isInitialSelected and UDim2.new(1, 0, 1, 0) or UDim2.new(0, 0, 1, 0), BackgroundTransparency = 0.8})
-                        table.insert(optionButtons, OptBtn)
-                        
-                        OptBtn.MouseButton1Click:Connect(function()
-                            if isMulti then
-                                if table.find(selected, opt) then
-                                    table.remove(selected, table.find(selected, opt))
-                                else
-                                    table.insert(selected, opt)
-                                end
-                                internalSet(selected)
-                            else
-                                internalSet(opt)
-                                dropped = false
-                                Tween(Arrow, {Rotation = 0}, 0.3)
-                                Tween(DropFrame, {Size = UDim2.new(1, 0, 0, 50)}, 0.3)
-                                SearchBox.Visible = false
-                            end
-                        end)
-                    end
-                    UpdateText()
-
-                    SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
-                        local q = SearchBox.Text:lower()
-                        for _, btn in ipairs(optionButtons) do
-                            if q == "" or string.find(btn.Text:lower(), q) then btn.Visible = true else btn.Visible = false end
-                        end
-                    end)
-
-                    DList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-                        ListFrame.CanvasSize = UDim2.new(0, 0, 0, DList.AbsoluteContentSize.Y)
-                        if dropped then
-                            local dynamicHeight = math.min(DList.AbsoluteContentSize.Y, listHeight)
-                            local newOpenHeight = 50 + 32 + dynamicHeight
-                            ListFrame.Size = UDim2.new(1, -20, 0, dynamicHeight)
-                            Tween(DropFrame, {Size = UDim2.new(1, 0, 0, newOpenHeight)}, 0.1)
-                        end
-                    end)
-
-                    MainBtn.MouseButton1Click:Connect(function()
-                        dropped = not dropped
-                        if dropped then
-                            SearchBox.Visible = true
-                            SearchBox.Text = ""
-                            Tween(Arrow, {Rotation = 180}, 0.3)
-                            local dynamicHeight = math.min(DList.AbsoluteContentSize.Y, listHeight)
-                            local newOpenHeight = 50 + 32 + dynamicHeight
-                            ListFrame.Size = UDim2.new(1, -20, 0, dynamicHeight)
-                            Tween(DropFrame, {Size = UDim2.new(1, 0, 0, newOpenHeight)}, 0.3)
-                        else
-                            SearchBox.Visible = false
-                            Tween(Arrow, {Rotation = 0}, 0.3)
-                            Tween(DropFrame, {Size = UDim2.new(1, 0, 0, 50)}, 0.3)
-                        end
-                    end)
-                    AddInfoIcon(DropFrame, UDim2.new(1, -25, 0, 0), infoData)
-
-                    Window.ConfigElements[name] = { Set = internalSet, Get = function() return selected end }
-
-                    local DropdownAPI = {}
-                    function DropdownAPI:Refresh(newOptions)
-                        for _, btn in ipairs(optionButtons) do
-                            btn:Destroy()
-                        end
+                    local function PopulateOptions(newOptions)
+                        for _, btn in ipairs(optionButtons) do btn:Destroy() end
                         optionButtons = {}
-                        options = newOptions or {}
-
-                        if not isMulti and not table.find(options, selected) then
-                            selected = options[1] or nil
-                        end
-
-                        for _, opt in pairs(options) do
-                            local isInitialSelected = (not isMulti and selected == opt) or (isMulti and table.find(selected, opt) ~= nil)
-                            local OptBtn = Create("TextButton", {Parent = ListFrame, Text = opt, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = isInitialSelected and TextColor or SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 25), AutoButtonColor = false})
-                            local Check = Create("Frame", {Parent = OptBtn, BackgroundColor3 = AccentColor, Size = isInitialSelected and UDim2.new(1, 0, 1, 0) or UDim2.new(0, 0, 1, 0), BackgroundTransparency = 0.8})
+                        
+                        for _, opt in pairs(newOptions) do
+                            local isSel = (isMulti and table.find(selected, opt) ~= nil) or (not isMulti and selected == opt)
+                            local OptBtn = Create("TextButton", {Parent = ListFrame, Text = opt, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = isSel and TextColor or SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 25), AutoButtonColor = false, ZIndex = 13})
+                            Create("Frame", {Parent = OptBtn, BackgroundColor3 = AccentColor, Size = isSel and UDim2.new(1, 0, 1, 0) or UDim2.new(0, 0, 1, 0), BackgroundTransparency = 0.8, ZIndex = 12})
                             table.insert(optionButtons, OptBtn)
                             
                             OptBtn.MouseButton1Click:Connect(function()
                                 if isMulti then
-                                    if table.find(selected, opt) then
-                                        table.remove(selected, table.find(selected, opt))
-                                    else
-                                        table.insert(selected, opt)
-                                    end
+                                    if table.find(selected, opt) then table.remove(selected, table.find(selected, opt)) else table.insert(selected, opt) end
                                     internalSet(selected)
                                 else
                                     internalSet(opt)
@@ -1049,9 +936,68 @@ end)
                                     Tween(Arrow, {Rotation = 0}, 0.3)
                                     Tween(DropFrame, {Size = UDim2.new(1, 0, 0, 50)}, 0.3)
                                     SearchBox.Visible = false
+                                    DropFrame.ZIndex = 10
                                 end
                             end)
                         end
+                    end
+
+                    PopulateOptions(options)
+                    UpdateText()
+
+                    SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+                        local q = SearchBox.Text:lower()
+                        for _, btn in ipairs(optionButtons) do
+                            btn.Visible = (q == "" or string.find(btn.Text:lower(), q) ~= nil)
+                        end
+                    end)
+
+                    local function UpdateDropdownSize()
+                        local visibleItems = 0
+                        for _, btn in ipairs(optionButtons) do
+                            if btn.Visible then visibleItems = visibleItems + 1 end
+                        end
+                        
+                        local targetListHeight = math.min(visibleItems * 25, 125)
+                        ListFrame.CanvasSize = UDim2.new(0, 0, 0, visibleItems * 25)
+                        
+                        if dropped then
+                            DropFrame.ZIndex = 50 
+                            Tween(ListFrame, {Size = UDim2.new(1, -20, 0, targetListHeight)}, 0.2)
+                            Tween(DropFrame, {Size = UDim2.new(1, 0, 0, 50 + 28 + targetListHeight + 10)}, 0.2)
+                        end
+                    end
+
+                    DList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateDropdownSize)
+
+                    MainBtn.MouseButton1Click:Connect(function()
+                        dropped = not dropped
+                        if dropped then
+                            SearchBox.Visible = true
+                            SearchBox.Text = "" 
+                            Tween(Arrow, {Rotation = 180}, 0.3)
+                            UpdateDropdownSize()
+                        else
+                            DropFrame.ZIndex = 10
+                            SearchBox.Visible = false
+                            Tween(Arrow, {Rotation = 0}, 0.3)
+                            Tween(DropFrame, {Size = UDim2.new(1, 0, 0, 50)}, 0.3)
+                            Tween(ListFrame, {Size = UDim2.new(1, -20, 0, 0)}, 0.3)
+                        end
+                    end)
+                    
+                    AddInfoIcon(DropFrame, UDim2.new(1, -25, 0, 0), infoData)
+
+                    Window.ConfigElements[name] = { Set = internalSet, Get = function() return selected end }
+
+                    local DropdownAPI = {}
+                    function DropdownAPI:Refresh(newOptions)
+                        PopulateOptions(newOptions)
+                        
+                        if not isMulti and not table.find(newOptions, selected) then
+                            selected = newOptions[1] or nil
+                        end
+                        
                         UpdateText()
                     end
 
@@ -1060,7 +1006,7 @@ end)
 
                     return DropdownAPI
                 end
-
+                
                 function Elements:AddTextbox(name, placeholder, callback, infoData)
                     local TxtFrame = Create("Frame", {Parent = ItemContainer, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 50)})
                     Create("TextLabel", {Parent = TxtFrame, Text = name, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(1, -20, 0, 15), Position = UDim2.new(0, 10, 0, 0), TextXAlignment = Enum.TextXAlignment.Left})
@@ -1085,14 +1031,14 @@ end)
                     local h, s, v_hsv = color:ToHSV()
                     local dropped = false
                     
-                    local CFrame = Create("Frame", {Parent = ItemContainer, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30), ClipsDescendants = true})
+                    local CFrame = Create("Frame", {Parent = ItemContainer, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30), ClipsDescendants = true, ZIndex = 9})
                     Create("TextLabel", {Parent = CFrame, Text = name, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(1, -60, 0, 30), Position = UDim2.new(0, 10, 0, 0), TextXAlignment = Enum.TextXAlignment.Left})
+                    
                     local DisplayBtn = Create("TextButton", {Parent = CFrame, Text = "", BackgroundColor3 = color, Size = UDim2.new(0, 30, 0, 16), Position = UDim2.new(1, -40, 0.5, -8), AutoButtonColor = false})
                     Create("UICorner", {Parent = DisplayBtn, CornerRadius = UDim.new(0, 4)})
                     Create("UIStroke", {Parent = DisplayBtn, Color = Color3.fromRGB(255,255,255), Transparency = 0.8, Thickness = 1})
                     AddBounce(DisplayBtn)
 
-                    -- Area Expandida para acomodar o input RGB
                     local PickerArea = Create("Frame", {Parent = CFrame, BackgroundColor3 = BackgroundColor, Size = UDim2.new(1, -20, 0, 170), Position = UDim2.new(0, 10, 0, 35)})
                     Create("UICorner", {Parent = PickerArea, CornerRadius = UDim.new(0, 4)})
 
@@ -1102,7 +1048,7 @@ end)
                     
                     PickerClose.MouseEnter:Connect(function() Tween(PickerClose, {TextColor3 = Color3.fromRGB(255, 60, 60)}, 0.2) end)
                     PickerClose.MouseLeave:Connect(function() Tween(PickerClose, {TextColor3 = SubTextColor}, 0.2) end)
-                    PickerClose.MouseButton1Click:Connect(function() dropped = false Tween(CFrame, {Size = UDim2.new(1, 0, 0, 30)}, 0.3) end)
+                    PickerClose.MouseButton1Click:Connect(function() dropped = false CFrame.ZIndex = 9 Tween(CFrame, {Size = UDim2.new(1, 0, 0, 30)}, 0.3) end)
 
                     local SVMap = Create("TextButton", {Parent = PickerArea, Text = "", BackgroundColor3 = Color3.fromHSV(h, 1, 1), Size = UDim2.new(1, -45, 0, 90), Position = UDim2.new(0, 10, 0, 10), AutoButtonColor = false, Active = true})
                     Create("UICorner", {Parent = SVMap, CornerRadius = UDim.new(0, 4)})
@@ -1126,7 +1072,6 @@ end)
                     Create("UICorner", {Parent = HueRing, CornerRadius = UDim.new(0, 2)})
                     Create("UIStroke", {Parent = HueRing, Color = Color3.new(0,0,0), Thickness = 1})
                     
-                    -- // Modificação: RGB Input
                     local initialRGB = string.format("%d, %d, %d", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
                     local RGBInput = Create("TextBox", {Parent = PickerArea, Text = initialRGB, PlaceholderText = "R, G, B", Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = TextColor, BackgroundColor3 = Color3.fromRGB(25, 25, 30), Size = UDim2.new(1, -20, 0, 24), Position = UDim2.new(0, 10, 0, 135), ClearTextOnFocus = false})
                     Create("UICorner", {Parent = RGBInput, CornerRadius = UDim.new(0, 4)})
@@ -1192,7 +1137,7 @@ end)
                         end
                     end)
 
-                    DisplayBtn.MouseButton1Click:Connect(function() dropped = not dropped Tween(CFrame, {Size = UDim2.new(1, 0, 0, dropped and 215 or 30)}, 0.3) end)
+                    DisplayBtn.MouseButton1Click:Connect(function() dropped = not dropped if dropped then CFrame.ZIndex = 49 else CFrame.ZIndex = 9 end Tween(CFrame, {Size = UDim2.new(1, 0, 0, dropped and 215 or 30)}, 0.3) end)
                     AddInfoIcon(CFrame, UDim2.new(1, -65, 0, 7), infoData)
 
                     Window.ConfigElements[name] = { Set = internalSet, Get = function() return color:ToHex() end }
@@ -1216,7 +1161,7 @@ end)
                     Create("UIPadding", {Parent = Monitor, PaddingTop = UDim.new(0, 5), PaddingBottom = UDim.new(0, 5), PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5)})
 
                     MonitorLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-                        Monitor.CanvasSize = UDim2.new(0, 0, 0, MonitorLayout.AbsoluteContentSize.Y + 30)
+                        Monitor.CanvasSize = UDim2.new(0, 0, 0, MonitorLayout.AbsoluteContentSize.Y + 10)
                     end)
 
                     local deleteMode = false
