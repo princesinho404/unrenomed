@@ -46,18 +46,34 @@ local HomeTab = Window:CreateTab("Home", true, false)
 local Home_Page = HomeTab:CreatePage("Informações")
 local InfoCard = Home_Page:CreateSection("Dados do Jogador")
 
-InfoCard:AddButton("Jogador: " .. LocalPlayer.Name, function() end)
+-- Colocamos o botão de nome dentro de uma variável (btnJogador) para alterar o texto depois
+local btnJogador = InfoCard:AddButton("Jogador: " .. LocalPlayer.Name, function() end)
 InfoCard:AddButton("Executor: " .. (identifyexecutor and identifyexecutor() or "Desconhecido"), function() end)
 InfoCard:AddButton("Versão: Premium 1.0.1", function() end)
 InfoCard:AddButton("Desenvolvedor: Princesinho", function() end)
 InfoCard:AddButton("Status: 🟢 Ativo", function() end)
 
 local AppearanceCard = Home_Page:CreateSection("UI Config")
-AppearanceCard:AddToggle("Interface trasparente", false, function(state) 
+
+AppearanceCard:AddToggle("Interface transparente", false, function(state) 
     Window:SetTransparency(state and 0.2 or 0) 
 end, {
-    Title = "Trasparencia",
-    Description = "Deixa a interface trasparente"
+    Title = "Transparência",
+    Description = "Deixa a interface transparente"
+})
+
+-- Novo Toggle: Modo Anônimo
+AppearanceCard:AddToggle("Modo Anonimo", false, function(state) 
+    if state then
+        -- Se ativado, esconde o nome
+        btnJogador:Set("Jogador: [ Anônimo ]")
+    else
+        -- Se desativado, puxa o nome verdadeiro de novo
+        btnJogador:Set("Jogador: " .. LocalPlayer.Name)
+    end
+end, {
+    Title = "Modo Anônimo",
+    Description = "Oculta o seu nick na interface"
 })
 -- ========================================== --
 -- 📂 TAB 2: EB DO DELTA
