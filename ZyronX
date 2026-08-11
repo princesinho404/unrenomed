@@ -227,7 +227,7 @@ function Library:CreateWindow(options)
     -- =========================================================================
     -- // CONFIGURAÇÃO DO BOTÃO MOBILE / ATALHO SECRETO
     -- =========================================================================
-    local botaoinv = 0.5 -- 0.5 = Semi-transparente (para testes) | 1 = 100% Invisível (Secreto) | 0 = Opaco
+    local botaoinv = 1 -- 0.5 = Semi-transparente (para testes) | 1 = 100% Invisível (Secreto) | 0 = Opaco
 
     -- ScreenGui separado para o botão continuar clicável mesmo quando a UI principal for ocultada
     local ToggleGui = Create("ScreenGui", {
