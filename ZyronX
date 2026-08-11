@@ -942,21 +942,24 @@ function Library:CreateWindow(options)
                     end)
 
                     MainBtn.MouseButton1Click:Connect(function()
-                        dropped = not dropped
-                        if dropped then
-                            SearchBox.Visible = true
-                            SearchBox.Text = ""
-                            Tween(Arrow, {Rotation = 180}, 0.3)
-                            local dynamicHeight = math.min(DList.AbsoluteContentSize.Y, listHeight)
-                            local newOpenHeight = 50 + 32 + dynamicHeight
-                            ListFrame.Size = UDim2.new(1, -20, 0, dynamicHeight)
-                            Tween(DropFrame, {Size = UDim2.new(1, 0, 0, newOpenHeight)}, 0.3)
-                        else
-                            SearchBox.Visible = false
-                            Tween(Arrow, {Rotation = 0}, 0.3)
-                            Tween(DropFrame, {Size = UDim2.new(1, 0, 0, 50)}, 0.3)
-                        end
-                    end)
+    dropped = not dropped
+    if dropped then
+        SearchBox.Visible = true
+        SearchBox.Text = ""
+        Tween(Arrow, {Rotation = 180}, 0.3)
+        local dynamicHeight = math.min(DList.AbsoluteContentSize.Y, listHeight)
+        
+        -- Mesma margem de +15 para garantir espaço
+        local newOpenHeight = 50 + 32 + dynamicHeight + 15 
+        
+        ListFrame.Size = UDim2.new(1, -20, 0, dynamicHeight)
+        Tween(DropFrame, {Size = UDim2.new(1, 0, 0, newOpenHeight)}, 0.3)
+    else
+        SearchBox.Visible = false
+        Tween(Arrow, {Rotation = 0}, 0.3)
+        Tween(DropFrame, {Size = UDim2.new(1, 0, 0, 50)}, 0.3)
+    end
+end)
                     AddInfoIcon(DropFrame, UDim2.new(1, -25, 0, 0), infoData)
 
                     Window.ConfigElements[name] = { Set = internalSet, Get = function() return selected end }
