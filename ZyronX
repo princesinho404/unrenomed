@@ -215,6 +215,8 @@ function Library:CreateWindow(options)
     end
 
     local uniqueID = HttpService:GenerateGUID(false)
+    
+    -- // SCREENGUI PRINCIPAL
     local ScreenGui = Create("ScreenGui", {
         Name = "ZyronX_UI_" .. uniqueID,
         Parent = RunService:IsStudio() and game.Players.LocalPlayer:WaitForChild("PlayerGui") or CoreGui,
@@ -222,8 +224,10 @@ function Library:CreateWindow(options)
         IgnoreGuiInset = true
     })
 
-    -- // CONFIGURAÇÃO DO BOTÃO MOBILE / ATALHO
-    local botaoinv = 0.5 -- 0.5 = Semi-transparente (para testes) | 1 = 100% Invisível | 0 = Visível
+    -- =========================================================================
+    -- // CONFIGURAÇÃO DO BOTÃO MOBILE / ATALHO SECRETO
+    -- =========================================================================
+    local botaoinv = 0.5 -- 0.5 = Semi-transparente (para testes) | 1 = 100% Invisível (Secreto) | 0 = Opaco
 
     -- ScreenGui separado para o botão continuar clicável mesmo quando a UI principal for ocultada
     local ToggleGui = Create("ScreenGui", {
@@ -233,32 +237,47 @@ function Library:CreateWindow(options)
         IgnoreGuiInset = true
     })
 
-    -- Botão fixo no Canto Superior Direito da Tela
+    -- Botão Canto Superior Direito (Estilizado)
     local MobileToggleBtn = Create("TextButton", {
         Parent = ToggleGui,
         Name = "MobileToggleBtn",
         Size = UDim2.new(0, 45, 0, 45),
-        Position = UDim2.new(1, -55, 0, 10), -- 55px da borda direita, 10px do topo
+        Position = UDim2.new(1, -50, 0, 5), -- Posição no canto superior direito
         BackgroundColor3 = Color3.fromRGB(20, 20, 25),
         BackgroundTransparency = botaoinv,
-        Text = (botaoinv >= 1) and "" or "K", -- Exibe "K" para você saber onde ele está enquanto testa
-        TextColor3 = Color3.fromRGB(255, 255, 255),
+        Text = (botaoinv >= 1) and "" or "K",
+        TextColor3 = AccentColor,
         TextTransparency = botaoinv,
         Font = Enum.Font.GothamBold,
         TextSize = 14,
         ZIndex = 9999,
-        Active = true
+        Active = true,
+        AutoButtonColor = false
     })
-    Create("UICorner", {Parent = MobileToggleBtn, CornerRadius = UDim.new(0, 8)})
 
-    -- Função unificada para abrir/fechar a UI (usada tanto pelo teclado quanto pelo botão mobile)
+    Create("UICorner", {
+        Parent = MobileToggleBtn,
+        CornerRadius = UDim.new(0, 10)
+    })
+
+    local ToggleStroke = Create("UIStroke", {
+        Parent = MobileToggleBtn,
+        Color = AccentColor,
+        Thickness = 1.5,
+        Transparency = botaoinv
+    })
+
+    -- Efeito visual de animação ao clicar
+    AddBounce(MobileToggleBtn, 0.92)
+
+    -- Função unificada para abrir/fechar a UI
     local isUIHidden = false
     local function ToggleUI()
         isUIHidden = not isUIHidden
         ScreenGui.Enabled = not isUIHidden
     end
 
-    -- Tecla K no teclado
+    -- Atalho por tecla K no teclado
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.KeyCode == Enum.KeyCode.K then
@@ -269,6 +288,28 @@ function Library:CreateWindow(options)
     -- Clique / Toque no Botão Mobile
     MobileToggleBtn.MouseButton1Click:Connect(function()
         ToggleUI()
+    end)
+
+    -- =========================================================================
+    -- // COMANDOS DE CHAT PARA FECHAR E DELETAR TOTALMENTE A UI
+    -- =========================================================================
+    local TextChatService = game:GetService("TextChatService")
+    local cmdFechar
+
+    local function fecharInterface()
+        if ToggleGui then ToggleGui:Destroy() end
+        if ScreenGui then ScreenGui:Destroy() end
+        if cmdFechar then cmdFechar:Destroy() end
+    end
+
+    pcall(function()
+        cmdFechar = Instance.new("TextChatCommand")
+        cmdFechar.Name = "fechar"
+        cmdFechar.PrimaryAlias = "/fechar"
+        cmdFechar.SecondaryAlias = "/delete"
+        cmdFechar.Parent = TextChatService
+
+        cmdFechar.Triggered:Connect(fecharInterface)
     end)
 
     local NotifContainer = Create("Frame", {
