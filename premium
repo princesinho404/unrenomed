@@ -75,12 +75,9 @@ local DeltaTab = Window:CreateTab("EB do Delta", false, false)
 local Parkours_Page = DeltaTab:CreatePage("Parkours")
 local Torres_Page = DeltaTab:CreatePage("Torres")
 
--- Links RAW dos Trajetos (64 Saves Dinâmicos)
+-- Links RAW dos Trajetos (Agora apenas o Grupo A)
 local RAW_URLS = {
-    
-["Parkours"] = {
-
-    ["Grupo A"] = { -- LIDO QUANDO TIVER "Parkour1" NO WORKSPACE
+    ["Parkours"] = {
         ["Parkour 1"] = {
             ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%201/parkour_1_lento.json",
             ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%201/parkour_1_rapido.json",
@@ -105,83 +102,6 @@ local RAW_URLS = {
             ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%204/parkour_4_mais_rapido.json",
             ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/a%20--%20completo/parkour%204/parkour_4_sem_burla.json"
         }
-    },
-    ["Grupo B"] = { -- LIDO QUANDO TIVER "Parkour4" NO WORKSPACE
-        ["Parkour 1"] = {
-            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%201/parkour_1_lento.json",
-            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%201/parkour_1_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%201/parkour_1_mais_rapido.json",
-            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%201/parkour_1_sem_burla.json"
-        },
-        ["Parkour 2"] = {
-            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%202/parkour_2_lento.json",
-            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%202/parkour_2_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%202/parkour_2_mais_rapido.json",
-            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%202/parkour_2_sem_burla.json"
-        },
-        ["Parkour 3"] = {
-            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%203/parkour_3_lento.json",
-            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%203/parkour_3_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%203/parkour_3_mais_rapido.json",
-            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%203/parkour_3_sem_burla.json"
-        },
-        ["Parkour 4"] = {
-            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%204/parkour_4_lento.json",
-            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%204/parkour_4_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%204/parkour_4_mais_rapido.json",
-            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/b%20--%20completo/parkour%204/parkour_4_sem_burla.json"
-        }
-    },
-
-    ["Grupo C"] = { -- LIDO QUANDO TIVER "Parkour3" NO WORKSPACE
-        ["Parkour 1"] = {
-            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%201/parkour_1_lento.json",
-            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%201/parkour_1_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%201/parkour_1_mais_rapido.json",
-            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%201/parkour_1_sem_burla.json"
-        },
-        ["Parkour 2"] = {
-            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%202/parkour_2_lento.json",
-            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%202/parkour_2_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%202/parkour_2_mais_rapido.json",
-            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%202/parkour_2_sem_burla.json"
-        },
-        ["Parkour 3"] = {
-            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%203/parkour_3_lento.json",
-            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%203/parkour_3_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%203/parkour_3_mais_rapido.json",
-            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%203/parkour_3_sem_burla.json"
-        },
-        ["Parkour 4"] = {
-            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%204/parkour_4_lento.json",
-            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%204/parkour_4_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%204/parkour_4_mais_rapido.json",
-            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/c%20--%20completo/parkour%204/parkour_4_sem_burla.json"
-        }
-    },
-    ["Grupo D"] = { -- LIDO QUANDO TIVER "Parkour2" NO WORKSPACE
-        ["Parkour 1"] = {
-            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%201/parkour_1_lento.json",
-            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%201/parkour_1_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%201/parkour_1_mais_rapido.json",
-            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%201/parkour_1_sem_burla.json"},
-        ["Parkour 2"] = {
-            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%202/parkour_2_lento.json",
-            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%202/parkour_2_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%202/parkour_2_mais_rapido.json",
-            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%202/parkour_2_sem_burla.json" },
-        ["Parkour 3"] = {
-            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%203/parkour_3_lento.json",
-            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%203/parkour_3_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%203/parkour_3_mais_rapido.json",
-            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%203/parkour_3_sem_burla.json" },
-        ["Parkour 4"] = {
-            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_lento.json",
-            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_mais_rapido.json",
-            ["Sem Burla"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/d%20--%20completo/parkour%204/parkour_4_sem_burla.json" }
-
-    }
     },
     ["Torres"] = {
         ["Torre 1"] = {
@@ -220,7 +140,7 @@ RunService.PostSimulation:Connect(function(deltaTime)
             end
         end
         
-        -- Calcula o tempo limite (usa tempoTotal, se não tiver, usa o tempo da última posição gravada)
+        -- Calcula o tempo limite
         local tempoLimite = slotAtivo.tempoTotal or historico[#historico].tempo
         
         -- Só finaliza se realmente passou do tempo final
@@ -316,37 +236,14 @@ local function iniciarTrajetoHavac(dadosDoTrajeto)
 end
 
 -- ========================================== --
--- FUNÇÕES DE LEITURA DO WORKSPACE E EXECUÇÃO
+-- FUNÇÕES DE EXECUÇÃO
 -- ========================================== --
-
--- Verifica qual grupo de parkour está no workspace
-local function getGrupoAtivo()
-    local parkoursFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Parkours")
-    if not parkoursFolder then return nil end
-
-    if parkoursFolder:FindFirstChild("Parkour1") then return "Grupo A" end
-    if parkoursFolder:FindFirstChild("Parkour4") then return "Grupo B" end
-    if parkoursFolder:FindFirstChild("Parkour3") then return "Grupo C" end
-    if parkoursFolder:FindFirstChild("Parkour2") then return "Grupo D" end
-    
-    return nil
-end
 
 local function executarRota(categoria, identifier, versao)
     local url = ""
     
     if categoria == "Parkours" then
-        local grupoAtivo = getGrupoAtivo()
-        
-        -- ALTERAÇÃO AQUI: Se não encontrar mapa, usa o Grupo A como padrão
-        if not grupoAtivo then
-            grupoAtivo = "Grupo A"
-            Library:Notify({Title = "Aviso", Description = "Nenhum mapa detectado. Usando rotas do Grupo A.", Duration = 4})
-        else
-            Library:Notify({Title = "Mapa Detectado", Description = "Carregando rotas do " .. grupoAtivo, Duration = 2})
-        end
-        
-        url = RAW_URLS["Parkours"][grupoAtivo][identifier][versao]
+        url = RAW_URLS["Parkours"][identifier][versao]
     else
         url = RAW_URLS["Torres"][identifier][versao]
     end
@@ -383,7 +280,7 @@ local function executarRota(categoria, identifier, versao)
 end
 
 -- ========================================== --
--- Seções e Elementos de Parkour na UI (APENAS 4 CARDS)
+-- Seções e Elementos de Parkour na UI
 -- ========================================== --
 local listaVersoes = {"Lento", "Rápido", "Mais Rápido", "Sem Burla"}
 local velocidadesParkour = {
@@ -405,11 +302,11 @@ for i = 1, 4 do
         executarRota("Parkours", nomeParkour, velocidadesParkour[nomeParkour])
     end)
 end
+
 -- ========================================== --
 -- Seções e Elementos de Torres na UI
 -- ========================================== --
 local opcoesTorre = {"Lento", "Rápido", "Mais Rápido"}
-
 
 local T1Card = Torres_Page:CreateSection("Torre 1")
 local versaoTorre1 = "Lento"
