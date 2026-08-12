@@ -457,7 +457,8 @@ function Library:CreateWindow(options)
 
     MakeDraggable(BottomDragHitbox, MainFrame)
 
-    RunService.RenderStepped:Connect(function()
+    -- Função isolada que só recalcula as coisas quando chamada
+    local function UpdateBottomBar()
         if MainFrame and MainFrame.Visible then
             BottomDragHitbox.Visible = true
             local currentScale = MainScale.Scale
@@ -476,7 +477,15 @@ function Library:CreateWindow(options)
         else
             BottomDragHitbox.Visible = false
         end
-    end)
+    end
+
+    -- Escuta ativamente as propriedades. Só gasta processamento SE essas propriedades mudarem!
+    MainFrame:GetPropertyChangedSignal("Position"):Connect(UpdateBottomBar)
+    MainFrame:GetPropertyChangedSignal("Visible"):Connect(UpdateBottomBar)
+    MainScale:GetPropertyChangedSignal("Scale"):Connect(UpdateBottomBar)
+    
+    -- Chama uma vez ao criar a UI para alinhar tudo
+    UpdateBottomBar()
 
     local TopBar = Create("Frame", {Parent = MainFrame, BackgroundColor3 = BackgroundColor, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 0, 0), Active = true})
     MakeDraggable(TopBar, MainFrame)
