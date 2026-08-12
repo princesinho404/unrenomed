@@ -35,6 +35,7 @@ local function SafeCopyToClipboard(text)
 end
 
 -- // Utility: Instance Creator
+-- // Utility: Instance Creator (FIX FPS: TextScaled removido)
 local function Create(className, properties)
     local instance = Instance.new(className)
     
@@ -45,17 +46,6 @@ local function Create(className, properties)
     for k, v in pairs(properties or {}) do
         instance[k] = v
     end
-    
-    if (className == "TextLabel" or className == "TextButton" or className == "TextBox") then
-        if properties.TextSize and properties.RichText ~= true then
-            instance.TextScaled = true
-            local constraint = Instance.new("UITextSizeConstraint")
-            constraint.MaxTextSize = properties.TextSize
-            constraint.MinTextSize = 6
-            constraint.Parent = instance
-        end
-    end
-    
     return instance
 end
 
@@ -242,7 +232,7 @@ function Library:CreateWindow(options)
         Parent = ToggleGui,
         Name = "MobileToggleBtn",
         Size = UDim2.new(0, 45, 0, 45),
-        Position = UDim2.new(1, -50, 0, 5),
+        Position = UDim2.new(1, -50, 0, 5), -- Posição no canto superior direito
         BackgroundColor3 = Color3.fromRGB(20, 20, 25),
         BackgroundTransparency = botaoinv,
         Text = (botaoinv >= 1) and "" or "K",
@@ -429,6 +419,7 @@ function Library:CreateWindow(options)
     Tween(MainFrame, {BackgroundTransparency = 0}, 0.5)
 
     -- // CORE ENGINE ADDITION: Floating Bottom Bar Natively Attached to ScreenGui
+    
     local BottomDragHitbox = Create("Frame", {
         Parent = ScreenGui,
         BackgroundTransparency = 1,
@@ -456,8 +447,7 @@ function Library:CreateWindow(options)
 
     MakeDraggable(BottomDragHitbox, MainFrame)
 
-    -- FIX FPS: Replaced RenderStepped with Event Listeners to stop infinite lag loops
-    local function UpdateBottomBar()
+    RunService.RenderStepped:Connect(function()
         if MainFrame and MainFrame.Visible then
             BottomDragHitbox.Visible = true
             local currentScale = MainScale.Scale
@@ -476,12 +466,7 @@ function Library:CreateWindow(options)
         else
             BottomDragHitbox.Visible = false
         end
-    end
-
-    MainFrame:GetPropertyChangedSignal("Position"):Connect(UpdateBottomBar)
-    MainFrame:GetPropertyChangedSignal("Visible"):Connect(UpdateBottomBar)
-    MainScale:GetPropertyChangedSignal("Scale"):Connect(UpdateBottomBar)
-    UpdateBottomBar()
+    end)
 
     local TopBar = Create("Frame", {Parent = MainFrame, BackgroundColor3 = BackgroundColor, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 0, 0), Active = true})
     MakeDraggable(TopBar, MainFrame)
@@ -532,21 +517,6 @@ function Library:CreateWindow(options)
     MakeDraggable(Sphere, Sphere)
 
     local Window = {CurrentTab = nil, Tabs = {}, Title = Title, AllCards = {}, MainFrame = MainFrame, CurrentTransparency = 0, ConfigElements = {}}
-
-    function Window:Toggle()
-        ToggleUI()
-    end
-    function Window:Destroy()
-        fecharInterface()
-    end
-    function Window:Show()
-        isUIHidden = false
-        ScreenGui.Enabled = true
-    end
-    function Window:Hide()
-        isUIHidden = true
-        ScreenGui.Enabled = false
-    end
 
     function Window:SetTransparency(val)
         Window.CurrentTransparency = val
@@ -636,7 +606,7 @@ function Library:CreateWindow(options)
             elseif desc:IsA("UIStroke") then Tween(desc, {Transparency = 1}, 0.3) end
         end
         task.wait(0.35)
-        fecharInterface()
+        ScreenGui:Destroy()
     end)
 
     NoBtn.MouseButton1Click:Connect(function()
@@ -785,6 +755,7 @@ function Library:CreateWindow(options)
             local L_Layout = Create("UIListLayout", {Parent = LeftColumn, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)})
             local R_Layout = Create("UIListLayout", {Parent = RightColumn, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)})
             
+            -- CORREÇÃO: Padding maior pro mobile e cálculos baseados no tamanho real da coluna
             local bottomPadding = isMobile and 240 or 60
             
             local function UpdateScrollCanvas()
@@ -830,7 +801,7 @@ function Library:CreateWindow(options)
                 local targetColumn = PageObj.Left and LeftColumn or RightColumn
                 PageObj.Left = not PageObj.Left
 
-                local SectionContainer = Create("Frame", {Parent = targetColumn, BackgroundColor3 = CardColor, Size = UDim2.new(1, 0, 0, 30), AutomaticSize = Enum.AutomaticSize.Y, ClipsDescendants = false})
+                local SectionContainer = Create("Frame", {Parent = targetColumn, BackgroundColor3 = CardColor, Size = UDim2.new(1, 0, 0, 30), AutomaticSize = Enum.AutomaticSize.Y, ClipsDescendants = false}) -- False para o Dropdown ZIndex funcionar
                 Create("UICorner", {Parent = SectionContainer, CornerRadius = UDim.new(0, 6)})
                 
                 table.insert(Window.AllCards, {
@@ -895,7 +866,7 @@ function Library:CreateWindow(options)
                     local Lever = Create("TextButton", {Parent = TogFrame, Text = "", BackgroundColor3 = state and AccentColor or Color3.fromRGB(45, 45, 50), Size = UDim2.new(0, 36, 0, 18), Position = UDim2.new(1, -46, 0.5, -9), AutoButtonColor = false})
                     Create("UICorner", {Parent = Lever, CornerRadius = UDim.new(1, 0)})
                     AddBounce(Lever)
-                   
+                    
                     local Knob = Create("Frame", {Parent = Lever, BackgroundColor3 = Color3.fromRGB(255, 255, 255), Size = UDim2.new(0, 14, 0, 14), Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)})
                     Create("UICorner", {Parent = Knob, CornerRadius = UDim.new(1, 0)})
 
@@ -1125,7 +1096,6 @@ function Library:CreateWindow(options)
                     Window.ConfigElements[name] = { Set = internalSet, Get = function() return Input.Text end }
                 end
 
-                -- FIX FPS: Fixed massive memory leak in ColorPicker's InputChanged event
                 function Elements:AddColorPicker(name, defaultColor, callback, infoData)
                     local color = defaultColor or Color3.fromRGB(255, 255, 255)
                     local h, s, v_hsv = color:ToHSV()
@@ -1212,53 +1182,29 @@ function Library:CreateWindow(options)
                         if callback then callback(color) end
                     end
 
-                    local moveConnection, endConnection
-
-                    local function DisconnectEvents()
-                        if moveConnection then moveConnection:Disconnect() moveConnection = nil end
-                        if endConnection then endConnection:Disconnect() endConnection = nil end
-                        if PageObj and PageObj.Scroll then PageObj.Scroll.ScrollingEnabled = true end
-                    end
-
-                    local function HandleColorInput(isSV)
-                        DisconnectEvents()
-                        if PageObj and PageObj.Scroll then PageObj.Scroll.ScrollingEnabled = false end
-
-                        moveConnection = UserInputService.InputChanged:Connect(function(moveInput)
-                            if moveInput.UserInputType == Enum.UserInputType.MouseMovement or moveInput.UserInputType == Enum.UserInputType.Touch then
-                                if isSV then
-                                    local relX = math.clamp((moveInput.Position.X - SVMap.AbsolutePosition.X) / SVMap.AbsoluteSize.X, 0, 1)
-                                    local relY = math.clamp((moveInput.Position.Y - SVMap.AbsolutePosition.Y) / SVMap.AbsoluteSize.Y, 0, 1)
-                                    s = relX
-                                    v_hsv = 1 - relY
-                                    SVRing.Position = UDim2.new(s, 0, 1-v_hsv, 0)
-                                    UpdateColor()
-                                else
-                                    local relX = math.clamp((moveInput.Position.X - HueSlider.AbsolutePosition.X) / HueSlider.AbsoluteSize.X, 0, 1)
-                                    h = relX
-                                    HueRing.Position = UDim2.new(h, 0, 0.5, 0)
-                                    UpdateColor()
-                                end
-                            end
-                        end)
-
-                        endConnection = UserInputService.InputEnded:Connect(function(endInput)
-                            if endInput.UserInputType == Enum.UserInputType.MouseButton1 or endInput.UserInputType == Enum.UserInputType.Touch then
-                                DisconnectEvents()
-                            end
-                        end)
-                    end
+                    local draggingSV = false
+                    local draggingHue = false
                     
-                    SVMap.InputBegan:Connect(function(input) 
-                        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
-                            HandleColorInput(true)
-                        end 
-                    end)
-                    
-                    HueSlider.InputBegan:Connect(function(input) 
-                        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
-                            HandleColorInput(false)
-                        end 
+                    SVMap.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingSV = true if PageObj and PageObj.Scroll then PageObj.Scroll.ScrollingEnabled = false end end end)
+                    HueSlider.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingHue = true if PageObj and PageObj.Scroll then PageObj.Scroll.ScrollingEnabled = false end end end)
+                    UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingSV = false draggingHue = false if PageObj and PageObj.Scroll then PageObj.Scroll.ScrollingEnabled = true end end end)
+
+                    UserInputService.InputChanged:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                            if draggingSV then
+                                local relX = math.clamp((input.Position.X - SVMap.AbsolutePosition.X) / SVMap.AbsoluteSize.X, 0, 1)
+                                local relY = math.clamp((input.Position.Y - SVMap.AbsolutePosition.Y) / SVMap.AbsoluteSize.Y, 0, 1)
+                                s = relX
+                                v_hsv = 1 - relY
+                                SVRing.Position = UDim2.new(s, 0, 1-v_hsv, 0)
+                                UpdateColor()
+                            elseif draggingHue then
+                                local relX = math.clamp((input.Position.X - HueSlider.AbsolutePosition.X) / HueSlider.AbsoluteSize.X, 0, 1)
+                                h = relX
+                                HueRing.Position = UDim2.new(h, 0, 0.5, 0)
+                                UpdateColor()
+                            end
+                        end
                     end)
 
                     DisplayBtn.MouseButton1Click:Connect(function() dropped = not dropped if dropped then CFrame.ZIndex = 49 else CFrame.ZIndex = 9 end Tween(CFrame, {Size = UDim2.new(1, 0, 0, dropped and 215 or 30)}, 0.3) end)
