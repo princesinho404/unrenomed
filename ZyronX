@@ -447,7 +447,8 @@ function Library:CreateWindow(options)
 
     MakeDraggable(BottomDragHitbox, MainFrame)
 
-    RunService.RenderStepped:Connect(function()
+    -- // Substituição do RenderStepped por Eventos (Zero Impacto no FPS)
+    local function UpdateBottomBar()
         if MainFrame and MainFrame.Visible then
             BottomDragHitbox.Visible = true
             local currentScale = MainScale.Scale
@@ -466,7 +467,14 @@ function Library:CreateWindow(options)
         else
             BottomDragHitbox.Visible = false
         end
-    end)
+    end
+
+    -- Atualiza apenas quando houver mudança real, economizando 100% de CPU livre
+    MainFrame:GetPropertyChangedSignal("Position"):Connect(UpdateBottomBar)
+    MainScale:GetPropertyChangedSignal("Scale"):Connect(UpdateBottomBar)
+    MainFrame:GetPropertyChangedSignal("Visible"):Connect(UpdateBottomBar)
+    
+    UpdateBottomBar()
 
     local TopBar = Create("Frame", {Parent = MainFrame, BackgroundColor3 = BackgroundColor, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 0, 0), Active = true})
     MakeDraggable(TopBar, MainFrame)
