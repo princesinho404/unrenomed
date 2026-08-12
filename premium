@@ -337,12 +337,16 @@ local function executarRota(categoria, identifier, versao)
     
     if categoria == "Parkours" then
         local grupoAtivo = getGrupoAtivo()
+        
+        -- ALTERAÇÃO AQUI: Se não encontrar mapa, usa o Grupo A como padrão
         if not grupoAtivo then
-            Library:Notify({Title = "Erro", Description = "Nenhum mapa de parkour detectado no Workspace.", Duration = 3})
-            return
+            grupoAtivo = "Grupo A"
+            Library:Notify({Title = "Aviso", Description = "Nenhum mapa detectado. Usando rotas do Grupo A.", Duration = 4})
+        else
+            Library:Notify({Title = "Mapa Detectado", Description = "Carregando rotas do " .. grupoAtivo, Duration = 2})
         end
+        
         url = RAW_URLS["Parkours"][grupoAtivo][identifier][versao]
-        Library:Notify({Title = "Mapa Detectado", Description = "Carregando rotas do " .. grupoAtivo, Duration = 2})
     else
         url = RAW_URLS["Torres"][identifier][versao]
     end
