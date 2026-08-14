@@ -141,9 +141,9 @@ local RAW_URLS = {
         },
         ["Torre 2"] = {
             ["Frente"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_lento.json",
-            ["Direita ->"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_rapido.json",
-            ["Esquerda <-"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_mais_rapido.json",
-            ["Atrâs"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre1_v2.json"
+            ["Direita ->"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_mais_rapido.json",
+            ["Esquerda <-"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_rapido.json",
+            ["Atrâs"] = "http://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_atr%C3%A2s"
         }
     }
 }
