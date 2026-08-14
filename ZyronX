@@ -89,369 +89,6 @@ local function AddBounce(button, scaleFactor)
     end)
 end
 
--- // Utility: Draggable (Lag-Free & No Memory Leak Fix)
-local function MakeDraggable(topbar, object)
-    topbar.Active = true
-    object.Active = true
-    local dragStart, startPos
-    local moveConnection, endConnection
-    
-    topbar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragStart = input.Position
-            startPos = object.Position
-            
-            if moveConnection then moveConnection:Disconnect() end
-            if endConnection then endConnection:Disconnect() end
-            
-            moveConnection = UserInputService.InputChanged:Connect(function(changedInput)
-                if changedInput.UserInputType == Enum.UserInputType.MouseMovement or changedInput.UserInputType == Enum.UserInputType.Touch then
-                    local delta = changedInput.Position - dragStart
-                    Tween(object, {Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)}, 0.08)
-                end
-            end)
-            
-            endConnection = input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    if moveConnection then moveConnection:Disconnect() end
-                    if endConnection then endConnection:Disconnect() end
-                end
-            end)
-        end
-    end)
-end
-
-local AccentColor = Color3.fromRGB(190, 140, 255)
-local BackgroundColor = Color3.fromRGB(18, 18, 20)
-local CardColor = Color3.fromRGB(24, 24, 27)
-local HoverColor = Color3.fromRGB(35, 35, 40)
-local TextColor = Color3.fromRGB(240, 240, 240)
-local SubTextColor = Color3.fromRGB(150, 150, 150)
-
--- // Global Notification API
-local GlobalNotifContainer
-
-function Library:Notify(options)
-    if not GlobalNotifContainer then return end
-    local title = options.Title or "Notification"
-    local desc = options.Description or "Information updated."
-    local duration = options.Duration or 3
-
-    local Notif = Create("Frame", {Parent = GlobalNotifContainer, BackgroundColor3 = Color3.fromRGB(20, 20, 22), Size = UDim2.new(1, 0, 0, 65), BackgroundTransparency = 1, ZIndex = 201, ClipsDescendants = true})
-    Create("UICorner", {Parent = Notif, CornerRadius = UDim.new(0, 8)})
-    local Stroke = Create("UIStroke", {Parent = Notif, Color = AccentColor, Thickness = 1.5, Transparency = 1})
-
-    local TitleText = Create("TextLabel", {Parent = Notif, Text = title, Font = Enum.Font.GothamBold, TextSize = 13, TextColor3 = TextColor, BackgroundTransparency = 1, Position = UDim2.new(0, 15, 0, 15), Size = UDim2.new(1, -30, 0, 15), TextXAlignment = Enum.TextXAlignment.Left, TextTransparency = 1, ZIndex = 202})
-    local DescText = Create("TextLabel", {Parent = Notif, Text = desc, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = SubTextColor, BackgroundTransparency = 1, Position = UDim2.new(0, 15, 0, 32), Size = UDim2.new(1, -30, 0, 15), TextXAlignment = Enum.TextXAlignment.Left, TextTransparency = 1, ZIndex = 202})
-
-    Tween(Notif, {BackgroundTransparency = 0}, 0.3)
-    Tween(Stroke, {Transparency = 0}, 0.3)
-    Tween(TitleText, {TextTransparency = 0}, 0.3)
-    Tween(DescText, {TextTransparency = 0}, 0.3)
-
-    task.delay(duration, function()
-        Tween(Notif, {BackgroundTransparency = 1}, 0.4)
-        Tween(Stroke, {Transparency = 1}, 0.4)
-        Tween(TitleText, {TextTransparency = 1}, 0.4)
-        Tween(DescText, {TextTransparency = 1}, 0.4)
-        task.wait(0.4)
-        Notif:Destroy()
-    end)
-end
-
-function Library:CreateWindow(options)
-    local hubName = "ZyronX Ui Lib"
-    local subText = "Made By Hypol-X"
-    local subColor = AccentColor
-    local sphTextToggle = false
-    local sphWords = "ZX"
-    local sphImage = nil
-    local topbarLogo = nil
-    local logoSize = 32
-    local sphIconSize = 26
-
-    if type(options) == "table" then
-        hubName = options.Title or hubName
-        subText = options.Subtitle or subText
-        subColor = options.SubtitleColor or subColor
-        
-        if options.SphereText ~= nil then
-            sphTextToggle = options.SphereText
-        end
-        if options.SphereWords ~= nil then
-            local wordList = string.split(tostring(options.SphereWords), " ")
-            if #wordList > 2 then
-                sphWords = wordList[1] .. " " .. wordList[2]
-            else
-                sphWords = tostring(options.SphereWords)
-            end
-        end
-        
-        sphImage = options.SphereImage
-        topbarLogo = options.Logo
-        logoSize = options.LogoSize or 32
-        sphIconSize = options.SphereIconSize or 26
-    elseif type(options) == "string" then
-        hubName = options
-    end
-
-    local uniqueID = HttpService:GenerateGUID(false)
-    
-    -- // SCREENGUI PRINCIPAL
-    local ScreenGui = Create("ScreenGui", {
-        Name = "ZyronX_UI_" .. uniqueID,
-        Parent = RunService:IsStudio() and game.Players.LocalPlayer:WaitForChild("PlayerGui") or CoreGui,
-        ResetOnSpawn = false,
-        IgnoreGuiInset = true
-    })
-
-    -- =========================================================================
-    -- // CONFIGURAÇÃO DO BOTÃO MOBILE / ATALHO SECRETO
-    -- =========================================================================
-    local botaoinv = 1 -- 0.5 = Semi-transparente (para testes) | 1 = 100% Invisível (Secreto) | 0 = Opaco
-
-    local ToggleGui = Create("ScreenGui", {
-        Name = "ZyronX_Toggle_" .. uniqueID,
-        Parent = RunService:IsStudio() and game.Players.LocalPlayer:WaitForChild("PlayerGui") or CoreGui,
-        ResetOnSpawn = false,
-        IgnoreGuiInset = true
-    })
-
-    local MobileToggleBtn = Create("TextButton", {
-        Parent = ToggleGui,
-        Name = "MobileToggleBtn",
-        Size = UDim2.new(0, 45, 0, 45),
-        Position = UDim2.new(1, -50, 0, 5),
-        BackgroundColor3 = Color3.fromRGB(20, 20, 25),
-        BackgroundTransparency = botaoinv,
-        Text = (botaoinv >= 1) and "" or "K",
-        TextColor3 = AccentColor,
-        TextTransparency = botaoinv,
-        Font = Enum.Font.GothamBold,
-        TextSize = 14,
-        ZIndex = 9999,
-        Active = true,
-        AutoButtonColor = false
-    })
-
-    Create("UICorner", {
-        Parent = MobileToggleBtn,
-        CornerRadius = UDim.new(0, 10)
-    })
-
-    local ToggleStroke = Create("UIStroke", {
-        Parent = MobileToggleBtn,
-        Color = AccentColor,
-        Thickness = 1.5,
-        Transparency = botaoinv
-    })
-
-    AddBounce(MobileToggleBtn, 0.92)
-
-    local isUIHidden = false
-    local function ToggleUI()
-        isUIHidden = not isUIHidden
-        ScreenGui.Enabled = not isUIHidden
-    end
-
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.KeyCode == Enum.KeyCode.K then
-            ToggleUI()
-        end
-    end)
-
-    MobileToggleBtn.MouseButton1Click:Connect(function()
-        ToggleUI()
-    end)
-
-    -- =========================================================================
-    -- // COMANDOS DE CHAT PARA FECHAR E DELETAR TOTALMENTE A UI
-    -- =========================================================================
-    local TextChatService = game:GetService("TextChatService")
-    local cmdFechar
-
-    local function fecharInterface()
-        if ToggleGui then ToggleGui:Destroy() end
-        if ScreenGui then ScreenGui:Destroy() end
-        if cmdFechar then cmdFechar:Destroy() end
-    end
-
-    pcall(function()
-        cmdFechar = Instance.new("TextChatCommand")
-        cmdFechar.Name = "fechar"
-        cmdFechar.PrimaryAlias = "/fechar"
-        cmdFechar.SecondaryAlias = "/delete"
-        cmdFechar.Parent = TextChatService
-
-        cmdFechar.Triggered:Connect(fecharInterface)
-    end)
-
-    local NotifContainer = Create("Frame", {
-        Parent = ScreenGui,
-        BackgroundTransparency = 1,
-        Size = UDim2.new(0, 320, 1, -20),
-        Position = UDim2.new(1, -340, 0, 10),
-        ZIndex = 200,
-        Active = false
-    })
-    Create("UIListLayout", {Parent = NotifContainer, VerticalAlignment = Enum.VerticalAlignment.Bottom, HorizontalAlignment = Enum.HorizontalAlignment.Right, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 12)})
-    GlobalNotifContainer = NotifContainer
-
-    local function SendPremiumNotification()
-        local Notif = Create("Frame", {Parent = NotifContainer, BackgroundColor3 = Color3.fromRGB(20, 20, 22), Size = UDim2.new(1, 0, 0, 65), BackgroundTransparency = 1, ZIndex = 201, ClipsDescendants = true})
-        Create("UICorner", {Parent = Notif, CornerRadius = UDim.new(0, 8)})
-        
-        local Stroke = Create("UIStroke", {Parent = Notif, Thickness = 1.5, Transparency = 1})
-        local StrokeGrad = Create("UIGradient", {Parent = Stroke, Color = ColorSequence.new(Color3.fromRGB(255, 215, 0), Color3.fromRGB(180, 130, 20)), Rotation = 45})
-
-        local LockIcon = Create("ImageLabel", {Parent = Notif, BackgroundTransparency = 1, Size = UDim2.new(0, 24, 0, 24), Position = UDim2.new(0, 15, 0.5, -12), Image = "rbxassetid://6031082533", ImageColor3 = Color3.fromRGB(255, 215, 0), ImageTransparency = 1, ZIndex = 202})
-        local TitleText = Create("TextLabel", {Parent = Notif, Text = "ACCESS DENIED", Font = Enum.Font.GothamBlack, TextSize = 12, TextColor3 = SubTextColor, BackgroundTransparency = 1, Position = UDim2.new(0, 50, 0, 15), Size = UDim2.new(1, -60, 0, 15), TextXAlignment = Enum.TextXAlignment.Left, TextTransparency = 1, ZIndex = 202})
-        local DescText = Create("TextLabel", {Parent = Notif, Text = 'This Is For <font color="#FFD700"><b>Whitelisted Users</b></font>', RichText = true, Font = Enum.Font.Gotham, TextSize = 14, TextColor3 = TextColor, BackgroundTransparency = 1, Position = UDim2.new(0, 50, 0, 32), Size = UDim2.new(1, -60, 0, 15), TextXAlignment = Enum.TextXAlignment.Left, TextTransparency = 1, ZIndex = 202})
-        
-        local Shine = Create("Frame", {Parent = Notif, BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0.8, BorderSizePixel = 0, Size = UDim2.new(0, 20, 2, 0), Position = UDim2.new(-0.2, 0, -0.5, 0), Rotation = 25, ZIndex = 203})
-
-        Tween(Notif, {BackgroundTransparency = 0}, 0.3)
-        Tween(Stroke, {Transparency = 0}, 0.3)
-        Tween(LockIcon, {ImageTransparency = 0}, 0.3)
-        Tween(TitleText, {TextTransparency = 0}, 0.3)
-        Tween(DescText, {TextTransparency = 0}, 0.3)
-
-        local shineTween = TweenService:Create(Shine, TweenInfo.new(0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = UDim2.new(1.2, 0, -0.5, 0)})
-        task.delay(0.2, function() shineTween:Play() end)
-
-        task.delay(4, function()
-            Tween(Notif, {BackgroundTransparency = 1}, 0.4)
-            Tween(Stroke, {Transparency = 1}, 0.4)
-            Tween(LockIcon, {ImageTransparency = 1}, 0.4)
-            Tween(TitleText, {TextTransparency = 1}, 0.4)
-            Tween(DescText, {TextTransparency = 1}, 0.4)
-            task.wait(0.4)
-            Notif:Destroy()
-        end)
-    end
-
-    local InfoOverlay = Create("Frame", {Parent = ScreenGui, BackgroundColor3 = Color3.fromRGB(5, 5, 8), BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), ZIndex = 150, Visible = false, Active = true})
-    local InfoCard = Create("Frame", {Parent = InfoOverlay, BackgroundColor3 = Color3.fromRGB(16, 16, 20), Size = UDim2.new(0, 360, 0, 280), Position = UDim2.new(0.5, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 151, BackgroundTransparency = 1, ClipsDescendants = true})
-    Create("UICorner", {Parent = InfoCard, CornerRadius = UDim.new(0, 8)})
-    Create("UIStroke", {Parent = InfoCard, Color = AccentColor, Thickness = 1.5, Transparency = 1})
-    local InfoScale = Create("UIScale", {Parent = InfoCard, Scale = 0})
-
-    local InfoHeader = Create("Frame", {Parent = InfoCard, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), ZIndex = 152})
-    local InfoTitle = Create("TextLabel", {Parent = InfoHeader, Text = "Feature Info", Font = Enum.Font.GothamBold, TextSize = 16, TextColor3 = TextColor, BackgroundTransparency = 1, Position = UDim2.new(0, 20, 0, 0), Size = UDim2.new(1, -60, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, TextTransparency = 1, ZIndex = 152})
-    local InfoCloseBtn = Create("TextButton", {Parent = InfoHeader, Text = "X", Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(0, 40, 1, 0), Position = UDim2.new(1, -40, 0, 0), ZIndex = 152, TextTransparency = 1})
-    AddBounce(InfoCloseBtn)
-
-    local InfoScroll = Create("ScrollingFrame", {Parent = InfoCard, BackgroundTransparency = 1, Size = UDim2.new(1, -40, 1, -60), Position = UDim2.new(0, 20, 0, 50), CanvasSize = UDim2.new(0, 0, 0, 0), ScrollBarThickness = 2, ScrollBarImageColor3 = AccentColor, BorderSizePixel = 0, ZIndex = 152})
-    local InfoLayout = Create("UIListLayout", {Parent = InfoScroll, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)})
-    local InfoDesc = Create("TextLabel", {Parent = InfoScroll, Text = "", Font = Enum.Font.Gotham, TextSize = 13, TextColor3 = SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, AutomaticSize = Enum.AutomaticSize.Y, ZIndex = 152, TextTransparency = 1})
-    local InfoExampleBox = Create("Frame", {Parent = InfoScroll, BackgroundColor3 = Color3.fromRGB(10, 10, 12), Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Visible = false, ZIndex = 152})
-    Create("UICorner", {Parent = InfoExampleBox, CornerRadius = UDim.new(0, 6)})
-    Create("UIStroke", {Parent = InfoExampleBox, Color = Color3.fromRGB(40, 40, 45), Thickness = 1})
-    local InfoExampleText = Create("TextLabel", {Parent = InfoExampleBox, Text = "", Font = Enum.Font.Code, TextSize = 12, TextColor3 = AccentColor, BackgroundTransparency = 1, Size = UDim2.new(1, -20, 0, 0), Position = UDim2.new(0, 10, 0, 10), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, AutomaticSize = Enum.AutomaticSize.Y, ZIndex = 152, TextTransparency = 1})
-    Create("UIPadding", {Parent = InfoExampleBox, PaddingBottom = UDim.new(0, 10)})
-
-    InfoLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() InfoScroll.CanvasSize = UDim2O lag que você está enfrentando no seu código (o primeiro) é causado principalmente por dois fatores que sobrecarregam o processamento do jogo:
-
-1. **Atualização de Posição Constante:** O evento `MainFrame:GetPropertyChangedSignal("Position")` está conectado à função `UpdateBottomBar`[cite: 1]. Toda vez que a interface se move milímetros, esse evento é disparado repetidamente.
-2. **Tween no Arrastar (Drag):** O uso de `Tween` para mover a interface dentro do evento de drag gera dezenas de animações sobrepostas por segundo[cite: 1], o que destrói a performance (FPS) quando combinado com o evento de atualização de posição. O segundo código é mais limpo nesse aspecto[cite: 2].
-
-Abaixo está o seu código modificado. Mantive **todos os seus sistemas exclusivos** (botão mobile invisível, comandos de chat `/fechar`, barra inferior flutuante)[cite: 1], mas reescrevi a lógica de arrastar e atualizar a barra para **zero lag**, alterando a física diretamente sem usar `Tweens` pesados.
-
-### Código Otimizado (Zero Lag)
-
-```lua
--- // ZyronX UI Library (Core Engine) - Optimized for Zero Lag Loops & Fixed Memory Leaks
-
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
-local RunService = game:GetService("RunService")
-local HttpService = game:GetService("HttpService")
-local TextService = game:GetService("TextService")
-
--- Verifica se é mobile (Touch ligado, Mouse desligado)
-local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
-local BASE_SCALE = isMobile and 0.65 or 1
-
-local Library = {
-    WhitelistedUsers = {} 
-}
-
--- // Utility: File System Mock Overrides
-local _isfolder = isfolder or function() return true end
-local _makefolder = makefolder or function() end
-local _writefile = writefile or function(path, data) warn("File saving not supported on this executor.") end
-local _readfile = readfile or function() return "{}" end
-local _listfiles = listfiles or function() return {} end
-local _delfile = delfile or function() warn("File deletion not supported.") end
-
--- // Utility: Safe Clipboard Copy
-local function SafeCopyToClipboard(text)
-    if setclipboard then
-        setclipboard(text)
-    elseif toclipboard then
-        toclipboard(text)
-    else
-        warn("Clipboard copying is not supported on your current executor.")
-    end
-end
-
--- // Utility: Instance Creator (FIX FPS: TextScaled removido)
-local function Create(className, properties)
-    local instance = Instance.new(className)
-    
-    if className == "TextBox" then
-        instance.Text = ""
-    end
-
-    for k, v in pairs(properties or {}) do
-        instance[k] = v
-    end
-    return instance
-end
-
--- // Utility: Build search index for a card (cached)
-local function BuildSearchIndex(card)
-    local parts = {}
-    for _, desc in ipairs(card:GetDescendants()) do
-        if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then
-            if desc.Text and desc.Text ~= "" then
-                table.insert(parts, desc.Text:lower())
-            end
-        end
-    end
-    return table.concat(parts, " ")
-end
-
--- // Utility: Smooth Tweening
-local function Tween(instance, properties, duration)
-    duration = duration or 0.25
-    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-    local tween = TweenService:Create(instance, tweenInfo, properties)
-    tween:Play()
-    return tween
-end
-
--- // Utility: Micro-Interaction Bounce
-local function AddBounce(button, scaleFactor)
-    scaleFactor = scaleFactor or 0.96
-    local scaleObj = button:FindFirstChild("UIScale") or Create("UIScale", {Parent = button, Scale = 1})
-    button.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            Tween(scaleObj, {Scale = scaleFactor}, 0.15)
-        end
-    end)
-    button.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            Tween(scaleObj, {Scale = 1}, 0.15)
-        end
-    end)
-    button.MouseLeave:Connect(function()
-        Tween(scaleObj, {Scale = 1}, 0.15)
-    end)
-end
-
 -- // Utility: Draggable (Lag-Free & Fixed Memory Leak)
 local function MakeDraggable(topbar, object, updateCallback)
     topbar.Active = true
@@ -487,10 +124,8 @@ local function MakeDraggable(topbar, object, updateCallback)
     UserInputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging then
             local delta = input.Position - dragStart
-            -- Substituição do Tween por cálculo direto (Zero Lag no Arrastar)
             object.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
             
-            -- Atualiza a barra inferior diretamente sem engatilhar o GetPropertyChangedSignal dezenas de vezes
             if updateCallback then
                 updateCallback()
             end
@@ -798,7 +433,6 @@ function Library:CreateWindow(options)
         Transparency = 0
     })
 
-    -- // Solução Zero Lag: Função chamada localmente durante o drag e escala, sem escutar posições o tempo todo
     local function UpdateBottomBar()
         if MainFrame and MainFrame.Visible then
             BottomDragHitbox.Visible = true
@@ -820,13 +454,11 @@ function Library:CreateWindow(options)
         end
     end
 
-    -- Escuta apenas Scale e Visible agora. O Update da Posição é ativado limpo no MakeDraggable
     MainScale:GetPropertyChangedSignal("Scale"):Connect(UpdateBottomBar)
     MainFrame:GetPropertyChangedSignal("Visible"):Connect(UpdateBottomBar)
     
     UpdateBottomBar()
 
-    -- Tornar tanto MainFrame quanto BottomBar draggables otimizados
     MakeDraggable(BottomDragHitbox, MainFrame, UpdateBottomBar)
 
     local TopBar = Create("Frame", {Parent = MainFrame, BackgroundColor3 = BackgroundColor, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 0, 0), Active = true})
@@ -1648,174 +1280,148 @@ function Library:CreateWindow(options)
                     Create("UICorner", {Parent = P_No, CornerRadius = UDim.new(0, 4)})
                     AddBounce(P_No)
 
-                    local function HideInternalPopup()
-                        Tween(InternalConfirmPopup, {BackgroundTransparency = 1}, 0.3)
-                        Tween(InternalConfirmPopup:FindFirstChild("UIStroke"), {Transparency = 1}, 0.3)
-                        Tween(P_Title, {TextTransparency = 1}, 0.3)
-                        Tween(P_Desc, {TextTransparency = 1}, 0.3)
-                        Tween(P_Yes, {BackgroundTransparency = 1, TextTransparency = 1}, 0.3)
-                        Tween(P_No, {BackgroundTransparency = 1, TextTransparency = 1}, 0.3)
-                        task.wait(0.3)
-                        InternalConfirmPopup.Visible = false
-                    end
-
                     local function RefreshMonitor()
-                        for _, v in ipairs(Monitor:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+                        for _, child in ipairs(Monitor:GetChildren()) do
+                            if child:IsA("Frame") then child:Destroy() end
+                        end
                         selectedForDelete = {}
 
                         local files = _listfiles(folderName)
-                        for _, filepath in ipairs(files) do
-                            local rawName = filepath:match("([^/\\]+)%.json$")
-                            if rawName then
-                                local displayFName = rawName:gsub("_%d+%.%d+$", ""):gsub("_%d+$", "")
+                        local query = ManagerSearch.Text:lower()
 
-                                local Row = Create("Frame", {Parent = Monitor, BackgroundColor3 = BackgroundColor, Size = UDim2.new(1, 0, 0, 30)})
-                                Create("UICorner", {Parent = Row, CornerRadius = UDim.new(0, 4)})
-                                
-                                local Title = Create("TextLabel", {Parent = Row, Text = displayFName, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = TextColor, BackgroundTransparency = 1, Size = UDim2.new(1, -60, 1, 0), Position = UDim2.new(0, 10, 0, 0), TextXAlignment = Enum.TextXAlignment.Left})
-                                
-                                local LoadBtn = Create("TextButton", {Parent = Row, Text = "Load", Font = Enum.Font.GothamBold, TextSize = 10, TextColor3 = TextColor, BackgroundColor3 = Color3.fromRGB(45, 120, 60), Size = UDim2.new(0, 35, 0, 20), Position = UDim2.new(1, -70, 0.5, -10), AutoButtonColor = false})
+                        for _, filePath in ipairs(files) do
+                            local fileName = filePath:match("[^/\\]+$") or filePath
+                            fileName = fileName:gsub("%.json$", "")
+
+                            if query == "" or fileName:lower():find(query, 1, true) then
+                                local FileRow = Create("Frame", {Parent = Monitor, BackgroundColor3 = Color3.fromRGB(22, 22, 26), Size = UDim2.new(1, 0, 0, 26)})
+                                Create("UICorner", {Parent = FileRow, CornerRadius = UDim.new(0, 4)})
+
+                                local FileLabel = Create("TextLabel", {Parent = FileRow, Text = fileName, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = TextColor, BackgroundTransparency = 1, Size = UDim2.new(1, -110, 1, 0), Position = UDim2.new(0, 8, 0, 0), TextXAlignment = Enum.TextXAlignment.Left})
+
+                                local LoadBtn = Create("TextButton", {Parent = FileRow, Text = "Load", Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = TextColor, BackgroundColor3 = AccentColor, Size = UDim2.new(0, 45, 0, 20), Position = UDim2.new(1, -100, 0.5, -10), AutoButtonColor = false})
                                 Create("UICorner", {Parent = LoadBtn, CornerRadius = UDim.new(0, 4)})
                                 AddBounce(LoadBtn)
 
-                                local EditBtn = Create("TextButton", {Parent = Row, Text = "Edit", Font = Enum.Font.GothamBold, TextSize = 10, TextColor3 = TextColor, BackgroundColor3 = Color3.fromRGB(150, 100, 45), Size = UDim2.new(0, 30, 0, 20), Position = UDim2.new(1, -33, 0.5, -10), AutoButtonColor = false})
+                                local EditBtn = Create("TextButton", {Parent = FileRow, Text = "Edit", Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = TextColor, BackgroundColor3 = Color3.fromRGB(50, 50, 55), Size = UDim2.new(0, 45, 0, 20), Position = UDim2.new(1, -50, 0.5, -10), AutoButtonColor = false})
                                 Create("UICorner", {Parent = EditBtn, CornerRadius = UDim.new(0, 4)})
                                 AddBounce(EditBtn)
 
-                                local SelectionMask = Create("TextButton", {Parent = Row, Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, -80, 1, 0), ZIndex = 2})
-                                
-                                SelectionMask.MouseButton1Click:Connect(function()
-                                    if deleteMode then
-                                        if selectedForDelete[filepath] then
-                                            selectedForDelete[filepath] = nil
-                                            Tween(Row, {BackgroundColor3 = BackgroundColor}, 0.2)
-                                        else
-                                            selectedForDelete[filepath] = true
-                                            Tween(Row, {BackgroundColor3 = Color3.fromRGB(180, 50, 50)}, 0.2)
-                                        end
-                                    end
-                                end)
-
                                 LoadBtn.MouseButton1Click:Connect(function()
-                                    if deleteMode or editMode then return end
-                                    local s, data = pcall(function() return HttpService:JSONDecode(_readfile(filepath)) end)
-                                    if s and type(data) == "table" then
+                                    local path = folderName .. "/" .. fileName .. ".json"
+                                    local content = _readfile(path)
+                                    local success, data = pcall(function() return HttpService:JSONDecode(content) end)
+                                    if success and type(data) == "table" then
                                         for k, v in pairs(data) do
-                                            if Window.ConfigElements[k] and Window.ConfigElements[k].Set then
+                                            if Window.ConfigElements[k] then
                                                 Window.ConfigElements[k].Set(v)
                                             end
                                         end
-                                        Library:Notify({Title = "Saves Loader", Description = "Successfully loaded " .. displayFName})
+                                        Library:Notify({Title = "Config Loaded", Description = "Successfully loaded '" .. fileName .. "'", Duration = 3})
                                     end
                                 end)
 
                                 EditBtn.MouseButton1Click:Connect(function()
-                                    if deleteMode then return end
                                     editMode = true
-                                    editTargetFile = filepath
-                                    NameBox.Text = displayFName
+                                    editTargetFile = fileName
+                                    NameBox.Text = fileName
                                     CreateBtn.Visible = false
                                     DeleteTogBtn.Visible = false
                                     ActionArea.Visible = true
                                     ConfirmActionBtn.Text = "Save Edit"
-                                    ConfirmActionBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 200)
+                                    ConfirmActionBtn.BackgroundColor3 = AccentColor
+                                end)
+
+                                FileRow.InputBegan:Connect(function(input)
+                                    if deleteMode and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+                                        local idx = table.find(selectedForDelete, fileName)
+                                        if idx then
+                                            table.remove(selectedForDelete, idx)
+                                            FileRow.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+                                        else
+                                            table.insert(selectedForDelete, fileName)
+                                            FileRow.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+                                        end
+                                    end
                                 end)
                             end
                         end
                     end
 
-                    local function ExecuteSave(saveName)
-                        local payload = {}
-                        for k, el in pairs(Window.ConfigElements) do
-                            if el.Get then payload[k] = el.Get() end
-                        end
-                        local encoded = HttpService:JSONEncode(payload)
-                        local uniqueKey = tostring(math.floor(tick()))
-                        local finalPath = folderName .. "/" .. saveName .. "_" .. uniqueKey .. ".json"
-                        _writefile(finalPath, encoded)
-                        RefreshMonitor()
-                        Library:Notify({Title = "Saved Successfully", Description = "Config [" .. saveName .. "] secured."})
-                    end
+                    ManagerSearch:GetPropertyChangedSignal("Text"):Connect(RefreshMonitor)
 
                     CreateBtn.MouseButton1Click:Connect(function()
-                        if NameBox.Text ~= "" then ExecuteSave(NameBox.Text) end
+                        local name = NameBox.Text ~= "" and NameBox.Text or "default_config"
+                        local data = {}
+                        for k, elem in pairs(Window.ConfigElements) do
+                            data[k] = elem.Get()
+                        end
+                        local json = HttpService:JSONEncode(data)
+                        _writefile(folderName .. "/" .. name .. ".json", json)
+                        NameBox.Text = ""
+                        RefreshMonitor()
+                        Library:Notify({Title = "Config Saved", Description = "Saved configuration as '" .. name .. "'", Duration = 3})
                     end)
 
                     DeleteTogBtn.MouseButton1Click:Connect(function()
-                        if editMode then return end
                         deleteMode = not deleteMode
                         DeleteTogBtn.Text = deleteMode and "Delete Mode: ON" or "Delete Mode: OFF"
-                        Tween(DeleteTogBtn, {BackgroundColor3 = deleteMode and Color3.fromRGB(180, 50, 50) or Color3.fromRGB(45, 45, 50)}, 0.2)
-                        
-                        ActionArea.Visible = deleteMode
-                        CreateBtn.Visible = not deleteMode
+                        DeleteTogBtn.BackgroundColor3 = deleteMode and Color3.fromRGB(180, 50, 50) or Color3.fromRGB(45, 45, 50)
                         if deleteMode then
+                            CreateBtn.Visible = false
+                            DeleteTogBtn.Visible = false
+                            ActionArea.Visible = true
                             ConfirmActionBtn.Text = "Delete Selected"
                             ConfirmActionBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-                        else
-                            RefreshMonitor()
                         end
                     end)
 
+                    CancelActionBtn.MouseButton1Click:Connect(function()
+                        deleteMode = false
+                        editMode = false
+                        selectedForDelete = {}
+                        NameBox.Text = ""
+                        CreateBtn.Visible = true
+                        DeleteTogBtn.Visible = true
+                        DeleteTogBtn.Text = "Delete Mode: OFF"
+                        DeleteTogBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+                        ActionArea.Visible = false
+                        RefreshMonitor()
+                    end)
+
                     ConfirmActionBtn.MouseButton1Click:Connect(function()
-                        if deleteMode then
-                            InternalConfirmPopup.Visible = true
-                            Tween(InternalConfirmPopup, {BackgroundTransparency = 0.1}, 0.3)
-                            Tween(InternalConfirmPopup:FindFirstChild("UIStroke"), {Transparency = 0.5}, 0.3)
-                            Tween(P_Title, {TextTransparency = 0}, 0.3)
-                            Tween(P_Desc, {TextTransparency = 0}, 0.3)
-                            Tween(P_Yes, {BackgroundTransparency = 0, TextTransparency = 0}, 0.3)
-                            Tween(P_No, {BackgroundTransparency = 0, TextTransparency = 0}, 0.3)
-                        elseif editMode then
+                        if editMode then
                             local newName = NameBox.Text
-                            if newName ~= "" then
-                                pcall(function() _delfile(editTargetFile) end)
-                                ExecuteSave(newName)
+                            if newName ~= "" and newName ~= editTargetFile then
+                                local oldPath = folderName .. "/" .. editTargetFile .. ".json"
+                                local newPath = folderName .. "/" .. newName .. ".json"
+                                local content = _readfile(oldPath)
+                                _writefile(newPath, content)
+                                _delfile(oldPath)
                             end
-                            editMode = false
-                            ActionArea.Visible = false
-                            CreateBtn.Visible = true
-                            DeleteTogBtn.Visible = true
-                            RefreshMonitor()
+                            CancelActionBtn:MouseButton1Click()
+                        elseif deleteMode then
+                            if #selectedForDelete > 0 then
+                                InternalConfirmPopup.Visible = true
+                                Tween(InternalConfirmPopup, {BackgroundTransparency = 0.1}, 0.2)
+                                Tween(P_Title, {TextTransparency = 0}, 0.2)
+                                Tween(P_Desc, {TextTransparency = 0}, 0.2)
+                                Tween(P_Yes, {BackgroundTransparency = 0, TextTransparency = 0}, 0.2)
+                                Tween(P_No, {BackgroundTransparency = 0, TextTransparency = 0}, 0.2)
+                            end
                         end
                     end)
 
                     P_Yes.MouseButton1Click:Connect(function()
-                        for file, _ in pairs(selectedForDelete) do pcall(function() _delfile(file) end) end
-                        deleteMode = false
-                        DeleteTogBtn.Text = "Delete Mode: OFF"
-                        DeleteTogBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-                        ActionArea.Visible = false
-                        CreateBtn.Visible = true
-                        RefreshMonitor()
-                        Library:Notify({Title = "Deletions Complete", Description = "Selected saves erased from system."})
-                        HideInternalPopup()
+                        for _, name in ipairs(selectedForDelete) do
+                            _delfile(folderName .. "/" .. name .. ".json")
+                        end
+                        InternalConfirmPopup.Visible = false
+                        CancelActionBtn:MouseButton1Click()
                     end)
 
                     P_No.MouseButton1Click:Connect(function()
-                        HideInternalPopup()
-                    end)
-
-                    CancelActionBtn.MouseButton1Click:Connect(function()
-                        editMode = false
-                        deleteMode = false
-                        DeleteTogBtn.Text = "Delete Mode: OFF"
-                        DeleteTogBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-                        ActionArea.Visible = false
-                        CreateBtn.Visible = true
-                        DeleteTogBtn.Visible = true
-                        NameBox.Text = ""
-                        RefreshMonitor()
-                    end)
-
-                    ManagerSearch:GetPropertyChangedSignal("Text"):Connect(function()
-                        local q = ManagerSearch.Text:lower()
-                        for _, v in ipairs(Monitor:GetChildren()) do
-                            if v:IsA("Frame") then
-                                local lbl = v:FindFirstChildOfClass("TextLabel")
-                                if lbl then v.Visible = (q == "" or string.find(lbl.Text:lower(), q) ~= nil) end
-                            end
-                        end
+                        InternalConfirmPopup.Visible = false
                     end)
 
                     RefreshMonitor()
@@ -1823,18 +1429,13 @@ function Library:CreateWindow(options)
 
                 return Elements
             end
+
             return PageObj
         end
 
-        if isDefault then
-            TabBtn.BackgroundTransparency = 0
-            Indicator.Size = UDim2.new(0, 3, 0, 18)
-            Txt.TextColor3 = TextColor
-            TabContent.Visible = true
-            Window.CurrentTab = TabConfig
-        end
         return TabConfig
     end
+
     return Window
 end
 
