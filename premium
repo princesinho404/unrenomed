@@ -67,6 +67,36 @@ AppearanceCard:AddToggle("Modo Anonimo", false, function(state)
 end, 
 { Title = "Modo Anônimo", Description = "Oculta o seu nick na interface"})
 -- ========================================== --
+-- ⚙️ SERVIÇOS E VARIÁVEIS BASE
+-- ========================================== --
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = newChar:WaitForChild("Humanoid")
+    rootPart = newChar:WaitForChild("HumanoidRootPart")
+end)
+
+-- Variáveis do Reprodutor e Animação
+local reproduzindo = false
+local tempoDecorrido = 0
+local slotAtivo = nil
+local delayInicio = 0
+local configSecurity = false -- false = Usa o Dummy Verde, true = Vai direto ao ponto
+
+local animTrackAtual = nil
+local idAnimTocando = nil
+local cacheAnimacoes = {}
+
+-- ========================================== --
 -- 📂 TAB 2: EB DO DELTA
 -- ========================================== --
 local DeltaTab = Window:CreateTab("EB do Delta", false, false)
@@ -108,137 +138,276 @@ local RAW_URLS = {
             ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_lento.json",
             ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_rapido.json",
             ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_1_mais_rapido.json",
-            ["Indisponível (4)"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre1_v2.json"
         },
         ["Torre 2"] = {
-            ["Lento"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_lento.json",
-            ["Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_rapido.json",
-            ["Mais Rápido"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_mais_rapido.json",
-            ["Indisponível (4)"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre1_v2.json"
+            ["Frente"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_lento.json",
+            ["Direita ->"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_rapido.json",
+            ["Esquerda <-"] = "https://raw.githubusercontent.com/princesinho404/saves/refs/heads/main/torres/torre_2_mais_rapido.json",
+            ["Atrâs"] = "https://raw.githubusercontent.com/seu-usuario/seu-repo/main/torre1_v2.json"
         }
     }
 }
 
--- Lógica do Reprodutor de Trajeto
-local reproduzindo = false
-local emTransicao = false
-local tempoDecorrido = 0
-local slotAtivo = nil
-
+-- ========================================== --
+-- 🔄 LOOP PRINCIPAL DE REPRODUÇÃO (POST-SIMULATION)
+-- ========================================== --
 RunService.PostSimulation:Connect(function(deltaTime)
-    if reproduzindo and rootPart and humanoid and slotAtivo and not emTransicao then
+    if reproduzindo and slotAtivo and rootPart and humanoid then
         tempoDecorrido = tempoDecorrido + deltaTime
         local historico = slotAtivo.dados
-        
-        -- Puxa o primeiro frame como salvaguarda
         local dadosAlvo = historico[1] 
         
         for i = #historico, 1, -1 do
-            if historico[i].tempo <= tempoDecorrido then
-                dadosAlvo = historico[i]
-                break
+            if historico[i].tempo <= tempoDecorrido then 
+                dadosAlvo = historico[i] 
+                break 
             end
         end
         
-        -- Calcula o tempo limite
-        local tempoLimite = slotAtivo.tempoTotal or historico[#historico].tempo
+        local tempoFinal = slotAtivo.tempoTotal or historico[#historico].tempo
         
-        -- Só finaliza se realmente passou do tempo final
-        if tempoDecorrido >= tempoLimite then
-            reproduzindo = false
-            humanoid.PlatformStand = false
-            slotAtivo = nil
+        if tempoDecorrido >= tempoFinal then
+            reproduzindo, slotAtivo = false, nil
+            
+            if animTrackAtual then
+                animTrackAtual:Stop(0.2)
+                animTrackAtual = nil
+                idAnimTocando = nil
+            end
+            
+            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
             Library:Notify({Title = "Parkour", Description = "Trajeto Concluído!", Duration = 3})
         else
+            rootPart.AssemblyLinearVelocity = Vector3.new(dadosAlvo.velX, dadosAlvo.velY, dadosAlvo.velZ)
+            rootPart.AssemblyAngularVelocity = Vector3.zero
+            
             local posX = slotAtivo.posicaoStart[1] + dadosAlvo.offX
             local posY = slotAtivo.posicaoStart[2] + dadosAlvo.offY
             local posZ = slotAtivo.posicaoStart[3] + dadosAlvo.offZ
             
-            rootPart.AssemblyLinearVelocity = Vector3.new(dadosAlvo.velX, dadosAlvo.velY, dadosAlvo.velZ)
             rootPart.CFrame = CFrame.new(posX, posY, posZ) * CFrame.fromEulerAnglesYXZ(0, dadosAlvo.rotY, 0)
             
             pcall(function()
-                if type(dadosAlvo.estado) == "number" then
-                    humanoid:ChangeState(Enum.HumanoidStateType:GetEnumItems()[dadosAlvo.estado + 1])
-                elseif type(dadosAlvo.estado) == "string" and Enum.HumanoidStateType[dadosAlvo.estado] then
-                    humanoid:ChangeState(Enum.HumanoidStateType[dadosAlvo.estado])
+                if dadosAlvo.estado then
+                    local stEnum = type(dadosAlvo.estado) == "string" and Enum.HumanoidStateType[dadosAlvo.estado] or (type(dadosAlvo.estado) == "number" and Enum.HumanoidStateType:GetEnumItems()[dadosAlvo.estado + 1])
+                    if stEnum and humanoid:GetState() ~= stEnum then 
+                        humanoid:ChangeState(stEnum) 
+                    end
                 end
             end)
+            
+            -- CROSSFADE SUAVE DE ANIMAÇÕES
+            if dadosAlvo.animId and dadosAlvo.animId ~= "" then
+                if idAnimTocando ~= dadosAlvo.animId then
+                    idAnimTocando = dadosAlvo.animId
+                    local novaTrack = cacheAnimacoes[dadosAlvo.animId]
+                    if novaTrack then
+                        pcall(function()
+                            local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
+                            if animator then
+                                for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                                    if track ~= novaTrack then
+                                        track:Stop(0.15)
+                                    end
+                                end
+                            end
+                        end)
+                        
+                        novaTrack.Priority = Enum.AnimationPriority.Action4
+                        novaTrack:AdjustWeight(1)
+                        if not novaTrack.IsPlaying then
+                            novaTrack:Play(0.15)
+                        end
+                        animTrackAtual = novaTrack
+                    end
+                end
+            end
         end
     end
 end)
 
-local function iniciarTrajetoHavac(dadosDoTrajeto)
-    if emTransicao then return end
+-- ========================================== --
+-- 🧍 LÓGICA DE INÍCIO COM DUMMY E REPRODUÇÃO
+-- ========================================== --
+local function iniciarTrajetoHavac(slot)
+    if not slot or not slot.dados or #slot.dados == 0 then
+        Library:Notify({Title = "Erro", Description = "Sem dados na rota!", Duration = 3})
+        return 
+    end
+    
+    reproduzindo = false
+    task.wait(0.05)
+    
+    slotAtivo = slot
+    tempoDecorrido = 0
+    idAnimTocando = nil
+    cacheAnimacoes = {}
+    
+    -- Prepara o Cache de Animações
+    pcall(function()
+        local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
+        if animator then
+            for _, frame in ipairs(slot.dados) do
+                if frame.animId and frame.animId ~= "" and not cacheAnimacoes[frame.animId] then
+                    local novaAnim = Instance.new("Animation")
+                    novaAnim.AnimationId = frame.animId
+                    cacheAnimacoes[frame.animId] = animator:LoadAnimation(novaAnim)
+                end
+            end
+        end
+    end)
 
-    if reproduzindo then
-        reproduzindo = false
-        humanoid.PlatformStand = false
-        slotAtivo = nil
-        Library:Notify({Title = "Parkour", Description = "Reprodução interrompida!", Duration = 3})
-        return
+    -- Remove Animate padrão para evitar travamentos
+    local animateScript = character:FindFirstChild("Animate")
+    if animateScript then animateScript:Destroy() end
+
+    local pStart = slot.posicaoStart or {rootPart.Position.X, rootPart.Position.Y, rootPart.Position.Z}
+    local pPrimeiro = slot.dados[1]
+    local posAlvoExata = Vector3.new(pStart[1] + pPrimeiro.offX, pStart[2] + pPrimeiro.offY, pStart[3] + pPrimeiro.offZ)
+    local targetCF = CFrame.new(posAlvoExata) * CFrame.fromEulerAnglesYXZ(0, pPrimeiro.rotY, 0)
+    local dist = (rootPart.Position - posAlvoExata).Magnitude
+
+    if animTrackAtual then
+        animTrackAtual:Stop(0.2)
+        animTrackAtual = nil
+        idAnimTocando = nil
     end
 
-    if dadosDoTrajeto and rootPart and humanoid then
-        tempoDecorrido = 0
-        local posStart = dadosDoTrajeto.posicaoStart or {rootPart.Position.X, rootPart.Position.Y, rootPart.Position.Z}
-        local pontoAlvo = Vector3.new(posStart[1], posStart[2], posStart[3])
-        local rotYAlvo = dadosDoTrajeto.dados[1].rotY
-        local targetCFrame = CFrame.new(pontoAlvo) * CFrame.fromEulerAnglesYXZ(0, rotYAlvo, 0)
+    if configSecurity then
+        local velAtual = humanoid.WalkSpeed
+        humanoid.WalkSpeed = 16
+        if dist > 1.2 and dist < 35 then
+            humanoid:MoveTo(posAlvoExata - Vector3.new(0, (humanoid and humanoid.HipHeight) and (humanoid.HipHeight + (rootPart.Size.Y / 2)) or 3.0, 0))
+            local t0 = os.clock()
+            while (Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z) - Vector3.new(posAlvoExata.X, 0, posAlvoExata.Z)).Magnitude > 1.2 and (os.clock() - t0) < 2.5 do 
+                task.wait() 
+            end
+            humanoid:MoveTo(rootPart.Position)
+            rootPart.AssemblyLinearVelocity, rootPart.AssemblyAngularVelocity, humanoid.AutoRotate = Vector3.zero, Vector3.zero
+            TweenService:Create(rootPart, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = targetCF}):Play()
+            task.wait(0.2)
+            humanoid.AutoRotate = true
+        else
+            character:PivotTo(targetCF)
+        end
+        humanoid.WalkSpeed = velAtual
         
-        slotAtivo = {
-            dados = dadosDoTrajeto.dados,
-            posicaoStart = posStart,
-            tempoTotal = dadosDoTrajeto.tempoTotal
-        }
-
-        rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-        rootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-        humanoid:ChangeState(Enum.HumanoidStateType.Running)
-
-        local distancia = (rootPart.Position - pontoAlvo).Magnitude
-        if distancia > 0.6 and distancia < 35 then
-            emTransicao = true
-            humanoid:MoveTo(pontoAlvo)
+        if delayInicio > 0 then task.wait(delayInicio) end
+        task.defer(function() reproduzindo = true end)
+        Library:Notify({Title = "Parkour", Description = "Reproduzindo Trajeto!", Duration = 3})
+    else
+        Library:Notify({Title = "Parkour", Description = "Vá até o DUMMY VERDE brilhante!", Duration = 3})
+        
+        -- CRIAÇÃO DO DUMMY VERDE HOLOGRÁFICO
+        local dummy = nil
+        pcall(function()
+            character.Archivable = true
+            dummy = character:Clone()
+            character.Archivable = false
             
-            local chegou = false
-            local conexao
-            conexao = humanoid.MoveToFinished:Connect(function()
-                chegou = true
-                conexao:Disconnect()
-            end)
-            
-            local inicioEspera = os.clock()
-            while not chegou and (os.clock() - inicioEspera < 2.5) do
-                if (rootPart.Position - pontoAlvo).Magnitude <= 1.2 then
-                    chegou = true
-                    break
+            for _, v in ipairs(dummy:GetDescendants()) do
+                if v:IsA("Script") or v:IsA("LocalScript") or v:IsA("ModuleScript") then
+                    v:Destroy()
                 end
+            end
+            
+            for _, v in ipairs(dummy:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.Material = Enum.Material.ForceField
+                    v.Color = Color3.fromRGB(0, 255, 0)
+                    v.CanCollide = false
+                    v.CanTouch = false
+                    v.Anchored = true
+                end
+            end
+            
+            -- Ajuste fino de altura para não afundar no chão
+            local offsetChao = Vector3.new(0, 1.5, 0) 
+            local posicaoCorrigida = targetCF + offsetChao
+            dummy:PivotTo(posicaoCorrigida)
+            
+            -- Waypoint "!" visível através de paredes
+            local parteReferencia = dummy:FindFirstChild("Head") or dummy:FindFirstChild("HumanoidRootPart")
+            if parteReferencia then
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "ExclamacaoWaypoint"
+                billboard.Size = UDim2.new(0, 50, 0, 50)
+                billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+                billboard.AlwaysOnTop = true
+                billboard.Adornee = parteReferencia
+                
+                local textLabel = Instance.new("TextLabel")
+                textLabel.Size = UDim2.new(1, 0, 1, 0)
+                textLabel.BackgroundTransparency = 1
+                textLabel.Text = "!"
+                textLabel.TextColor3 = Color3.fromRGB(255, 230, 0)
+                textLabel.TextScaled = true
+                textLabel.Font = Enum.Font.FredokaOne
+                
+                local uiStroke = Instance.new("UIStroke")
+                uiStroke.Thickness = 3
+                uiStroke.Color = Color3.fromRGB(0, 0, 0)
+                uiStroke.Parent = textLabel
+                
+                textLabel.Parent = billboard
+                billboard.Parent = dummy
+            end
+            
+            dummy.Parent = workspace
+        end)
+
+        local conectado = nil
+        local chegou = false
+        
+        local function iniciarCaminhadaSuave()
+            if chegou then return end
+            chegou = true
+            if conectado then conectado:Disconnect() end
+            
+            local velAtual = humanoid.WalkSpeed; humanoid.WalkSpeed = 16
+            humanoid:MoveTo(posAlvoExata)
+            
+            local t0 = os.clock()
+            while (Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z) - Vector3.new(posAlvoExata.X, 0, posAlvoExata.Z)).Magnitude > 1.2 and (os.clock() - t0) < 2.5 do
                 task.wait()
             end
-            if conexao.Connected then conexao:Disconnect() end
-
-            humanoid.AutoRotate = false
-            local tweenGiro = TweenService:Create(rootPart, TweenInfo.new(0.16, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = targetCFrame})
-            tweenGiro:Play()
-            tweenGiro.Completed:Wait()
             
+            humanoid:MoveTo(rootPart.Position)
+            rootPart.AssemblyLinearVelocity, rootPart.AssemblyAngularVelocity = Vector3.zero, Vector3.zero
+            TweenService:Create(rootPart, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = targetCF}):Play()
+            task.wait(0.2)
             humanoid.AutoRotate = true
-            emTransicao = false
-        else
-            rootPart.CFrame = targetCFrame
+            humanoid.WalkSpeed = velAtual
+            
+            if dummy then dummy:Destroy() end
+            
+            if delayInicio > 0 then task.wait(delayInicio) end
+            task.defer(function() reproduzindo = true end)
+            Library:Notify({Title = "Parkour", Description = "Reproduzindo Trajeto!", Duration = 3})
         end
-        
-        humanoid.PlatformStand = true
-        reproduzindo = true
-        Library:Notify({Title = "Parkour", Description = "Reproduzindo Trajeto!", Duration = 3})
+
+        -- Monitoramento de proximidade horizontal (ignora altura Y)
+        conectado = RunService.Heartbeat:Connect(function()
+            if not character or not rootPart or (not reproduzindo and slotAtivo == nil) then 
+                if conectado then conectado:Disconnect() end
+                if dummy then dummy:Destroy() end
+                return
+            end
+            
+            local posPlayerPlana = Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z)
+            local posAlvoPlana = Vector3.new(posAlvoExata.X, 0, posAlvoExata.Z)
+            local distanciaHorizontal = (posPlayerPlana - posAlvoPlana).Magnitude
+            
+            if distanciaHorizontal <= 3.0 and not chegou then
+                iniciarCaminhadaSuave()
+            end
+        end)
     end
 end
 
 -- ========================================== --
--- FUNÇÕES DE EXECUÇÃO
+-- 🌐 EXECUÇÃO E REQUISIÇÃO RAW
 -- ========================================== --
-
 local function executarRota(categoria, identifier, versao)
     local url = ""
     
@@ -280,7 +449,7 @@ local function executarRota(categoria, identifier, versao)
 end
 
 -- ========================================== --
--- Seções e Elementos de Parkour na UI
+-- 🎨 SEÇÕES E ELEMENTOS DE PARKOUR NA UI
 -- ========================================== --
 local listaVersoes = {"Lento", "Rápido", "Mais Rápido", "Sem Burla"}
 local velocidadesParkour = {
@@ -304,7 +473,7 @@ for i = 1, 4 do
 end
 
 -- ========================================== --
--- Seções e Elementos de Torres na UI
+-- 🏰 SEÇÕES E ELEMENTOS DE TORRES NA UI
 -- ========================================== --
 local opcoesTorre = {"Lento", "Rápido", "Mais Rápido"}
 
