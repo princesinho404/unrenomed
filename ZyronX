@@ -124,10 +124,10 @@ local function MakeDraggable(topbar, object, updateCallback)
     UserInputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging then
             local delta = input.Position - dragStart
-            -- Cálculo direto para evitar lag de animação durante o arrastar
+            -- Substituição do Tween por cálculo direto (Zero Lag no Arrastar)
             object.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
             
-            -- Atualiza a barra flutuante sincronizada sem criar eventos em loop
+            -- Atualiza a barra inferior diretamente sem engatilhar o GetPropertyChangedSignal dezenas de vezes
             if updateCallback then
                 updateCallback()
             end
@@ -218,7 +218,7 @@ function Library:CreateWindow(options)
         IgnoreGuiInset = true
     })
 
-    local botaoinv = 1 -- 1 = Invisível | 0 = Opaco
+    local botaoinv = 1
 
     local ToggleGui = Create("ScreenGui", {
         Name = "ZyronX_Toggle_" .. uniqueID,
@@ -231,7 +231,7 @@ function Library:CreateWindow(options)
         Parent = ToggleGui,
         Name = "MobileToggleBtn",
         Size = UDim2.new(0, 45, 0, 45),
-        Position = UDim2.new(1, -50, 0, 5),
+        Position = UDim2.new(1, -50, 0, 5), 
         BackgroundColor3 = Color3.fromRGB(20, 20, 25),
         BackgroundTransparency = botaoinv,
         Text = (botaoinv >= 1) and "" or "K",
@@ -275,7 +275,6 @@ function Library:CreateWindow(options)
         ToggleUI()
     end)
 
-    -- // Comandos de Chat
     local TextChatService = game:GetService("TextChatService")
     local cmdFechar
 
@@ -436,7 +435,7 @@ function Library:CreateWindow(options)
         Transparency = 0
     })
 
-    -- // Solução Zero Lag: Atualização síncrona sob demanda sem listeners pesados
+    -- // Solução Zero Lag: Função chamada localmente durante o drag e escala, sem escutar posições o tempo todo
     local function UpdateBottomBar()
         if MainFrame and MainFrame.Visible then
             BottomDragHitbox.Visible = true
@@ -458,11 +457,13 @@ function Library:CreateWindow(options)
         end
     end
 
+    -- Escuta apenas Scale e Visible agora. O Update da Posição é ativado limpo no MakeDraggable
     MainScale:GetPropertyChangedSignal("Scale"):Connect(UpdateBottomBar)
     MainFrame:GetPropertyChangedSignal("Visible"):Connect(UpdateBottomBar)
     
     UpdateBottomBar()
 
+    -- Tornar tanto MainFrame quanto BottomBar draggables otimizados
     MakeDraggable(BottomDragHitbox, MainFrame, UpdateBottomBar)
 
     local TopBar = Create("Frame", {Parent = MainFrame, BackgroundColor3 = BackgroundColor, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 0, 0), Active = true})
@@ -1284,182 +1285,37 @@ function Library:CreateWindow(options)
                     Create("UICorner", {Parent = P_No, CornerRadius = UDim.new(0, 4)})
                     AddBounce(P_No)
 
-                    local function RefreshFiles()
-                        for _, child in ipairs(Monitor:GetChildren()) do
-                            if child:IsA("Frame") then child:Destroy() end
-                        end
-                        selectedForDelete = {}
-                        
-                        local files = _listfiles(folderName)
-                        local searchQuery = ManagerSearch.Text:lower()
-
-                        for _, filePath in ipairs(files) do
-                            local fileName = filePath:match("([^/\\]+)%.json$") or filePath:match("([^/\\]+)$")
-                            if fileName and (searchQuery == "" or string.find(fileName:lower(), searchQuery)) then
-                                local FileCard = Create("Frame", {Parent = Monitor, BackgroundColor3 = Color3.fromRGB(22, 22, 26), Size = UDim2.new(1, 0, 0, 30)})
-                                Create("UICorner", {Parent = FileCard, CornerRadius = UDim.new(0, 4)})
-                                local CardStroke = Create("UIStroke", {Parent = FileCard, Color = Color3.fromRGB(45, 45, 50), Thickness = 1})
-
-                                local FileTitle = Create("TextLabel", {Parent = FileCard, Text = fileName, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = TextColor, BackgroundTransparency = 1, Size = UDim2.new(1, -110, 1, 0), Position = UDim2.new(0, 10, 0, 0), TextXAlignment = Enum.TextXAlignment.Left})
-
-                                local LoadBtn = Create("TextButton", {Parent = FileCard, Text = "Load", Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = TextColor, BackgroundColor3 = AccentColor, Size = UDim2.new(0, 45, 0, 20), Position = UDim2.new(1, -100, 0.5, -10), AutoButtonColor = false})
-                                Create("UICorner", {Parent = LoadBtn, CornerRadius = UDim.new(0, 4)})
-                                AddBounce(LoadBtn)
-
-                                local EditBtn = Create("TextButton", {Parent = FileCard, Text = "Edit", Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = TextColor, BackgroundColor3 = Color3.fromRGB(45, 45, 50), Size = UDim2.new(0, 45, 0, 20), Position = UDim2.new(1, -50, 0.5, -10), AutoButtonColor = false})
-                                Create("UICorner", {Parent = EditBtn, CornerRadius = UDim.new(0, 4)})
-                                AddBounce(EditBtn)
-
-                                LoadBtn.MouseButton1Click:Connect(function()
-                                    local content = _readfile(filePath)
-                                    local s_ok, data = pcall(function() return HttpService:JSONDecode(content) end)
-                                    if s_ok and type(data) == "table" then
-                                        for k, v in pairs(data) do
-                                            if Window.ConfigElements[k] then
-                                                Window.ConfigElements[k].Set(v)
-                                            end
-                                        end
-                                        Library:Notify({Title = "Config Loaded", Description = "Successfully loaded " .. fileName, Duration = 3})
-                                    end
-                                end)
-
-                                EditBtn.MouseButton1Click:Connect(function()
-                                    editMode = true
-                                    editTargetFile = filePath
-                                    NameBox.Text = fileName
-                                    CreateBtn.Visible = false
-                                    DeleteTogBtn.Visible = false
-                                    ActionArea.Visible = true
-                                    ConfirmActionBtn.Text = "Save Edit"
-                                end)
-
-                                FileCard.InputBegan:Connect(function(input)
-                                    if deleteMode and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-                                        if table.find(selectedForDelete, filePath) then
-                                            table.remove(selectedForDelete, table.find(selectedForDelete, filePath))
-                                            CardStroke.Color = Color3.fromRGB(45, 45, 50)
-                                            FileCard.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
-                                        else
-                                            table.insert(selectedForDelete, filePath)
-                                            CardStroke.Color = Color3.fromRGB(200, 50, 50)
-                                            FileCard.BackgroundColor3 = Color3.fromRGB(40, 20, 20)
-                                        end
-                                    end
-                                end)
-                            end
-                        end
+                    local function HideInternalPopup()
+                        Tween(InternalConfirmPopup, {BackgroundTransparency = 1}, 0.2)
+                        Tween(InternalConfirmPopup:FindFirstChild("UIStroke"), {Transparency = 1}, 0.2)
+                        Tween(P_Title, {TextTransparency = 1}, 0.2)
+                        Tween(P_Desc, {TextTransparency = 1}, 0.2)
+                        Tween(P_Yes, {BackgroundTransparency = 1, TextTransparency = 1}, 0.2)
+                        Tween(P_No, {BackgroundTransparency = 1, TextTransparency = 1}, 0.2)
+                        task.wait(0.2)
+                        InternalConfirmPopup.Visible = false
                     end
 
-                    ManagerSearch:GetPropertyChangedSignal("Text"):Connect(RefreshFiles)
+                    P_No.MouseButton1Click:Connect(HideInternalPopup)
 
-                    CreateBtn.MouseButton1Click:Connect(function()
-                        local name = NameBox.Text ~= "" and NameBox.Text or "Config_" .. os.time()
-                        local path = folderName .. "/" .. name .. ".json"
-                        
-                        local exportData = {}
-                        for k, elem in pairs(Window.ConfigElements) do
-                            exportData[k] = elem.Get()
-                        end
-
-                        _writefile(path, HttpService:JSONEncode(exportData))
-                        NameBox.Text = ""
-                        RefreshFiles()
-                        Library:Notify({Title = "Config Saved", Description = "Saved configuration as " .. name, Duration = 3})
+                    P_Yes.MouseButton1Click:Connect(function()
+                        HideInternalPopup()
+                        deleteMode = false
+                        DeleteTogBtn.Text = "Delete Mode: OFF"
+                        Tween(DeleteTogBtn, {BackgroundColor3 = Color3.fromRGB(45, 45, 50)}, 0.2)
                     end)
 
                     DeleteTogBtn.MouseButton1Click:Connect(function()
                         deleteMode = not deleteMode
                         DeleteTogBtn.Text = deleteMode and "Delete Mode: ON" or "Delete Mode: OFF"
-                        DeleteTogBtn.BackgroundColor3 = deleteMode and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(45, 45, 50)
-                        
-                        if deleteMode then
-                            CreateBtn.Visible = false
-                            DeleteTogBtn.Visible = false
-                            ActionArea.Visible = true
-                            ConfirmActionBtn.Text = "Delete Selected"
-                        else
-                            selectedForDelete = {}
-                            RefreshFiles()
-                        end
+                        Tween(DeleteTogBtn, {BackgroundColor3 = deleteMode and Color3.fromRGB(180, 50, 50) or Color3.fromRGB(45, 45, 50)}, 0.2)
                     end)
 
                     CancelActionBtn.MouseButton1Click:Connect(function()
-                        deleteMode = false
-                        editMode = false
-                        selectedForDelete = {}
-                        DeleteTogBtn.Text = "Delete Mode: OFF"
-                        DeleteTogBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+                        ActionArea.Visible = false
                         CreateBtn.Visible = true
                         DeleteTogBtn.Visible = true
-                        ActionArea.Visible = false
-                        NameBox.Text = ""
-                        RefreshFiles()
                     end)
-
-                    ConfirmActionBtn.MouseButton1Click:Connect(function()
-                        if editMode then
-                            if editTargetFile ~= "" and NameBox.Text ~= "" then
-                                local newPath = folderName .. "/" .. NameBox.Text .. ".json"
-                                local content = _readfile(editTargetFile)
-                                _writefile(newPath, content)
-                                if newPath ~= editTargetFile then
-                                    _delfile(editTargetFile)
-                                end
-                                Library:Notify({Title = "Config Renamed", Description = "Renamed save to " .. NameBox.Text, Duration = 3})
-                            end
-                            deleteMode = false
-                            editMode = false
-                            CreateBtn.Visible = true
-                            DeleteTogBtn.Visible = true
-                            ActionArea.Visible = false
-                            NameBox.Text = ""
-                            RefreshFiles()
-                        elseif deleteMode then
-                            if #selectedForDelete > 0 then
-                                InternalConfirmPopup.Visible = true
-                                Tween(InternalConfirmPopup, {BackgroundTransparency = 0}, 0.2)
-                                Tween(P_Title, {TextTransparency = 0}, 0.2)
-                                Tween(P_Desc, {TextTransparency = 0}, 0.2)
-                                Tween(P_Yes, {BackgroundTransparency = 0, TextTransparency = 0}, 0.2)
-                                Tween(P_No, {BackgroundTransparency = 0, TextTransparency = 0}, 0.2)
-                            end
-                        end
-                    end)
-
-                    P_Yes.MouseButton1Click:Connect(function()
-                        for _, file in ipairs(selectedForDelete) do
-                            _delfile(file)
-                        end
-                        selectedForDelete = {}
-                        Tween(InternalConfirmPopup, {BackgroundTransparency = 1}, 0.2)
-                        Tween(P_Title, {TextTransparency = 1}, 0.2)
-                        Tween(P_Desc, {TextTransparency = 1}, 0.2)
-                        Tween(P_Yes, {BackgroundTransparency = 1, TextTransparency = 1}, 0.2)
-                        Tween(P_No, {BackgroundTransparency = 1, TextTransparency = 1}, 0.2)
-                        task.wait(0.2)
-                        InternalConfirmPopup.Visible = false
-                        
-                        deleteMode = false
-                        DeleteTogBtn.Text = "Delete Mode: OFF"
-                        DeleteTogBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-                        CreateBtn.Visible = true
-                        DeleteTogBtn.Visible = true
-                        ActionArea.Visible = false
-                        RefreshFiles()
-                        Library:Notify({Title = "Configs Deleted", Description = "Selected configs deleted successfully.", Duration = 3})
-                    end)
-
-                    P_No.MouseButton1Click:Connect(function()
-                        Tween(InternalConfirmPopup, {BackgroundTransparency = 1}, 0.2)
-                        Tween(P_Title, {TextTransparency = 1}, 0.2)
-                        Tween(P_Desc, {TextTransparency = 1}, 0.2)
-                        Tween(P_Yes, {BackgroundTransparency = 1, TextTransparency = 1}, 0.2)
-                        Tween(P_No, {BackgroundTransparency = 1, TextTransparency = 1}, 0.2)
-                        task.wait(0.2)
-                        InternalConfirmPopup.Visible = false
-                    end)
-
-                    RefreshFiles()
                 end
 
                 return Elements
