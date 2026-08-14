@@ -923,6 +923,11 @@ local indiceRotaAtual = 1
 local listaDeRotas = {}
 local rotaSelecionada = "Nenhuma"
 
+-- Controle de Animação com Transição Suave (Crossfade)
+local animTrackAtual = nil
+local idAnimTocando = nil
+local cacheAnimacoes = {}
+
 --------------------------------------------------------------------
 -- 🧠 FUNÇÕES LÓGICAS DO TAS (ARQUIVOS, FÍSICA E RENDERIZAÇÃO)
 --------------------------------------------------------------------
@@ -1077,27 +1082,74 @@ local function aplicarFisicaSlow(ativo)
     end
 end
 
+--------------------------------------------------------------------
+-- LOOP PRINCIPAL DE GRAVAÇÃO E REPRODUÇÃO
+--------------------------------------------------------------------
 RunService.PostSimulation:Connect(function(deltaTime)
     if not rootPart or not humanoid then return end
+    
+    --------------------------------------------------------------------
+    -- 1. GRAVANDO A ROTA E AS ANIMAÇÕES
+    --------------------------------------------------------------------
     if gravando then
         local deltaReal = gravarEmSlow and (deltaTime * fatorSlow) or deltaTime
         tempoDecorrido = tempoDecorrido + deltaReal
         local _, y, _ = rootPart.CFrame:ToEulerAnglesYXZ()
         local multVel = gravarEmSlow and (1 / fatorSlow) or 1.0
+        
+        local animIdAtiva = nil
+        pcall(function()
+            local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
+            if animator then
+                for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                    if track.IsPlaying and track.Animation then
+                        animIdAtiva = track.Animation.AnimationId
+                        break
+                    end
+                end
+            end
+            
+            if not animIdAtiva then
+                local estado = humanoid:GetState()
+                if estado == Enum.HumanoidStateType.Running then
+                    if humanoid.MoveDirection.Magnitude > 0 then
+                        animIdAtiva = "rbxassetid://507767714"
+                    else
+                        animIdAtiva = "rbxassetid://507766388"
+                    end
+                elseif estado == Enum.HumanoidStateType.Jumping or estado == Enum.HumanoidStateType.Freefall then
+                    animIdAtiva = "rbxassetid://507765000"
+                end
+            end
+        end)
+
         table.insert(gravacaoTemporaria, {
-            tempo = tempoDecorrido, velX = rootPart.AssemblyLinearVelocity.X * multVel,
-            velY = rootPart.AssemblyLinearVelocity.Y * multVel, velZ = rootPart.AssemblyLinearVelocity.Z * multVel,
-            estado = humanoid:GetState().Name, rotY = y,
-            offX = rootPart.Position.X - posicaoInicial.X, offY = rootPart.Position.Y - posicaoInicial.Y, offZ = rootPart.Position.Z - posicaoInicial.Z
+            tempo = tempoDecorrido, 
+            velX = rootPart.AssemblyLinearVelocity.X * multVel,
+            velY = rootPart.AssemblyLinearVelocity.Y * multVel, 
+            velZ = rootPart.AssemblyLinearVelocity.Z * multVel,
+            estado = humanoid:GetState().Name, 
+            rotY = y,
+            offX = rootPart.Position.X - posicaoInicial.X, 
+            offY = rootPart.Position.Y - posicaoInicial.Y, 
+            offZ = rootPart.Position.Z - posicaoInicial.Z,
+            animId = animIdAtiva
         })
+        
+    --------------------------------------------------------------------
+    -- 2. REPRODUZINDO A ROTA COM TRANSIÇÃO SUAVE (CROSSFADE)
+    --------------------------------------------------------------------
     elseif reproduzindo and slotAtivo then
         tempoDecorrido = tempoDecorrido + deltaTime
         local historico = slotAtivo.dados
         local dadosAlvo = historico[1] 
+        
         for i = #historico, 1, -1 do
             if historico[i].tempo <= tempoDecorrido then dadosAlvo = historico[i] break end
         end
+        
         local tempoFinal = slotAtivo.tempoTotal or historico[#historico].tempo
+        
         if tempoDecorrido >= tempoFinal then
             if loopAtivo then
                 tempoDecorrido = 0
@@ -1106,6 +1158,13 @@ RunService.PostSimulation:Connect(function(deltaTime)
                 character:PivotTo(CFrame.new(slotAtivo.posicaoStart[1] + pIni.offX, slotAtivo.posicaoStart[2] + pIni.offY, slotAtivo.posicaoStart[3] + pIni.offZ) * CFrame.fromEulerAnglesYXZ(0, pIni.rotY, 0))
             else
                 reproduzindo, slotAtivo = false, nil
+                
+                if animTrackAtual then
+                    animTrackAtual:Stop(0.2)
+                    animTrackAtual = nil
+                    idAnimTocando = nil
+                end
+                
                 humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
                 pcall(function() Library:Notify({Title = "TAS", Description = "Reprodução Concluída!", Duration = 3}) end)
             end
@@ -1113,12 +1172,40 @@ RunService.PostSimulation:Connect(function(deltaTime)
             rootPart.AssemblyLinearVelocity = Vector3.new(dadosAlvo.velX, dadosAlvo.velY, dadosAlvo.velZ)
             rootPart.AssemblyAngularVelocity = Vector3.zero
             rootPart.CFrame = CFrame.new(slotAtivo.posicaoStart[1] + dadosAlvo.offX, slotAtivo.posicaoStart[2] + dadosAlvo.offY, slotAtivo.posicaoStart[3] + dadosAlvo.offZ) * CFrame.fromEulerAnglesYXZ(0, dadosAlvo.rotY, 0)
+            
             pcall(function()
                 if dadosAlvo.estado then
                     local stEnum = Enum.HumanoidStateType[dadosAlvo.estado]
                     if stEnum and humanoid:GetState() ~= stEnum then humanoid:ChangeState(stEnum) end
                 end
             end)
+            
+            -- CROSSFADE SUAVE: SÓ MUDA A ANIMAÇÃO QUANDO O ID REALMENTE MUDAR, COM TRANSIÇÃO FLUIDA
+            if dadosAlvo.animId and dadosAlvo.animId ~= "" then
+                if idAnimTocando ~= dadosAlvo.animId then
+                    idAnimTocando = dadosAlvo.animId
+                    local novaTrack = cacheAnimacoes[dadosAlvo.animId]
+                    if novaTrack then
+                        pcall(function()
+                            local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
+                            if animator then
+                                for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                                    if track ~= novaTrack then
+                                        track:Stop(0.15)
+                                    end
+                                end
+                            end
+                        end)
+                        
+                        novaTrack.Priority = Enum.AnimationPriority.Action4
+                        novaTrack:AdjustWeight(1)
+                        if not novaTrack.IsPlaying then
+                            novaTrack:Play(0.15)
+                        end
+                        animTrackAtual = novaTrack
+                    end
+                end
+            end
         end
     end
 end)
@@ -1129,16 +1216,37 @@ local function iniciarPlayback(slot)
     end
     reproduzindo = false; task.wait(0.05)
     slotAtivo = slot; tempoDecorrido = 0
+    idAnimTocando = nil
+    cacheAnimacoes = {}
+    
+    pcall(function()
+        local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
+        if animator then
+            for _, frame in ipairs(slot.dados) do
+                if frame.animId and frame.animId ~= "" and not cacheAnimacoes[frame.animId] then
+                    local novaAnim = Instance.new("Animation")
+                    novaAnim.AnimationId = frame.animId
+                    cacheAnimacoes[frame.animId] = animator:LoadAnimation(novaAnim)
+                end
+            end
+        end
+    end)
+
+    local animateScript = character:FindFirstChild("Animate")
+    if animateScript then animateScript:Destroy() end
+
     local pStart, pPrimeiro = slot.posicaoStart, slot.dados[1]
     local posAlvoExata = Vector3.new(pStart[1] + pPrimeiro.offX, pStart[2] + pPrimeiro.offY, pStart[3] + pPrimeiro.offZ)
     local targetCF = CFrame.new(posAlvoExata) * CFrame.fromEulerAnglesYXZ(0, pPrimeiro.rotY, 0)
     local dist = (rootPart.Position - posAlvoExata).Magnitude
 
-    -- ==========================================
-    -- 👻 LÓGICA DO TOGGLE MOVETO (DUMMY FANTASMA)
-    -- ==========================================
+    if animTrackAtual then
+        animTrackAtual:Stop(0.2)
+        animTrackAtual = nil
+        idAnimTocando = nil
+    end
+
     if configSecurity then
-        -- Se o toggle estiver ATIVADO: Vai direto de forma automatizada (seu comportamento antigo)
         local velAtual = humanoid.WalkSpeed; humanoid.WalkSpeed = 16
         if dist > 1.2 and dist < 35 then
             humanoid:MoveTo(posAlvoExata - Vector3.new(0, (humanoid and humanoid.HipHeight) and (humanoid.HipHeight + (rootPart.Size.Y / 2)) or 3.0, 0))
@@ -1153,60 +1261,115 @@ local function iniciarPlayback(slot)
         end
         humanoid.WalkSpeed = velAtual
     else
-        -- Se o toggle estiver DESATIVADO: Cria o Dummy Fantasma com Highlight visível através de tudo
-        Library:Notify({Title = "TAS", Description = "Vá até o ponto verde brilhante!", Duration = 3})
+        Library:Notify({Title = "TAS", Description = "Vá até o DUMMY VERDE brilhante!", Duration = 3})
         
-        local dummy = Instance.new("Part")
-        dummy.Size = Vector3.new(4, 5, 4)
-        dummy.Position = posAlvoExata
-        dummy.Anchored = true
-        dummy.CanCollide = false
-        dummy.Transparency = 0.5
-        dummy.Color = Color3.fromRGB(0, 255, 150)
-        dummy.Material = Enum.Material.Neon
-        dummy.Parent = workspace
+        -- CRIA O DUMMY E O ÍCONE DE EXCLAMAÇÃO (ALTURA E DISTÂNCIA HORIZONTAL CORRIGIDAS)
+        local dummy = nil
+        pcall(function()
+            character.Archivable = true
+            dummy = character:Clone()
+            character.Archivable = false
+            
+            for _, v in ipairs(dummy:GetDescendants()) do
+                if v:IsA("Script") or v:IsA("LocalScript") or v:IsA("ModuleScript") then
+                    v:Destroy()
+                end
+            end
+            
+            for _, v in ipairs(dummy:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.Material = Enum.Material.ForceField
+                    v.Color = Color3.fromRGB(0, 255, 0)
+                    v.CanCollide = false
+                    v.CanTouch = false
+                    v.Anchored = true
+                end
+            end
+            
+            -- Ajuste fino de altura para o dummy ficar perfeitamente em pé no chão (sem afundar)
+            local offsetChao = Vector3.new(0, 1.5, 0) 
+            local posicaoCorrigida = targetCF + offsetChao
+            dummy:PivotTo(posicaoCorrigida)
+            
+            -- Adiciona a interface da Exclamação acima da cabeça visível através de paredes
+            local parteReferencia = dummy:FindFirstChild("Head") or dummy:FindFirstChild("HumanoidRootPart")
+            if parteReferencia then
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "ExclamacaoWaypoint"
+                billboard.Size = UDim2.new(0, 50, 0, 50)
+                billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+                billboard.AlwaysOnTop = true
+                billboard.Adornee = parteReferencia
+                
+                local textLabel = Instance.new("TextLabel")
+                textLabel.Size = UDim2.new(1, 0, 1, 0)
+                textLabel.BackgroundTransparency = 1
+                textLabel.Text = "!"
+                textLabel.TextColor3 = Color3.fromRGB(255, 230, 0)
+                textLabel.TextScaled = true
+                textLabel.Font = Enum.Font.FredokaOne
+                
+                local uiStroke = Instance.new("UIStroke")
+                uiStroke.Thickness = 3
+                uiStroke.Color = Color3.fromRGB(0, 0, 0)
+                uiStroke.Parent = textLabel
+                
+                textLabel.Parent = billboard
+                billboard.Parent = dummy
+            end
+            
+            dummy.Parent = workspace
+        end)
 
-        local highlight = Instance.new("Highlight")
-        highlight.Parent = dummy
-        highlight.FillColor = dummy.Color
-        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-        highlight.FillTransparency = 0.4
-        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- Brilha através das paredes
-
-        local conectado
+        local conectado = nil
         local chegou = false
         
+        local function iniciarCaminhadaSuave()
+            if chegou then return end
+            chegou = true
+            if conectado then conectado:Disconnect() end
+            
+            local velAtual = humanoid.WalkSpeed; humanoid.WalkSpeed = 16
+            humanoid:MoveTo(posAlvoExata)
+            
+            local t0 = os.clock()
+            while (Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z) - Vector3.new(posAlvoExata.X, 0, posAlvoExata.Z)).Magnitude > 1.2 and (os.clock() - t0) < 2.5 do
+                task.wait()
+            end
+            
+            humanoid:MoveTo(rootPart.Position)
+            rootPart.AssemblyLinearVelocity, rootPart.AssemblyAngularVelocity = Vector3.zero, Vector3.zero
+            TweenService:Create(rootPart, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = targetCF}):Play()
+            task.wait(0.2)
+            humanoid.AutoRotate = true
+            humanoid.WalkSpeed = velAtual
+            
+            if dummy then dummy:Destroy() end
+            
+            if delayInicio > 0 then task.wait(delayInicio) end
+            task.defer(function() reproduzindo = true end)
+            Library:Notify({Title = "TAS", Description = "Reproduzindo Rota!", Duration = 3})
+        end
+
+        -- Sistema de proximidade corrigido (usa apenas distância horizontal X e Z para evitar falhas)
         conectado = RunService.Heartbeat:Connect(function()
-            if not character or not rootPart or not reproduzindo and slotAtivo == nil then 
+            if not character or not rootPart or (not reproduzindo and slotAtivo == nil) then 
                 if conectado then conectado:Disconnect() end
                 if dummy then dummy:Destroy() end
                 return
             end
             
-            local d = (rootPart.Position - dummy.Position).Magnitude
-            if d <= 3.5 and not chegou then
-                chegou = true
-                conectado:Disconnect()
-                
-                -- Ativa secretamente o MoveTo final bem pertinho para encaixar perfeitamente de forma legit
-                local velAtual = humanoid.WalkSpeed; humanoid.WalkSpeed = 16
-                humanoid:MoveTo(posAlvoExata)
-                task.wait(0.15)
-                character:PivotTo(targetCF)
-                humanoid.WalkSpeed = velAtual
-                
-                dummy:Destroy()
-                
-                if delayInicio > 0 then task.wait(delayInicio) end
-                task.defer(function() reproduzindo = true end)
-                Library:Notify({Title = "TAS", Description = "Reproduzindo Rota!", Duration = 3})
+            local posPlayerPlana = Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z)
+            local posAlvoPlana = Vector3.new(posAlvoExata.X, 0, posAlvoExata.Z)
+            local distanciaHorizontal = (posPlayerPlana - posAlvoPlana).Magnitude
+            
+            if distanciaHorizontal <= 3.0 and not chegou then
+                iniciarCaminhadaSuave()
             end
         end)
         
-        -- Interrompe a execução imediata para aguardar o player encostar no dummy
         return
     end
-    -- ==========================================
 
     rootPart.AssemblyLinearVelocity, rootPart.AssemblyAngularVelocity = Vector3.zero, Vector3.zero
 
@@ -1214,6 +1377,7 @@ local function iniciarPlayback(slot)
     task.defer(function() reproduzindo = true end)
     Library:Notify({Title = "TAS", Description = "Reproduzindo Rota!", Duration = 3})
 end
+
 --------------------------------------------------------------------
 -- 🎥 TAB 4: TAS (Rica em Funções)
 --------------------------------------------------------------------
@@ -1224,9 +1388,6 @@ local TasControls = TasRecPage:CreateSection("Rotas Temporárias")
 local TasConfig = TasRecPage:CreateSection("Configurações do Motor")
 local TasSaved = TasRecPage:CreateSection("Rotas Salvas")
 
--- ========================================================
--- PREPARANDO O DROPDOWN E A FUNÇÃO DE ATUALIZAR A UI
--- ========================================================
 local DropdownRotas = nil
 
 local function atualizarDropdownUI()
@@ -1236,15 +1397,12 @@ local function atualizarDropdownUI()
     
     if #listaDeRotas == 0 then table.insert(listaDeRotas, "Nenhuma") end
     
-    -- Busca o Dropdown direto da memória global que injetamos no Source!
     if _G.ZyronX_Dropdowns and _G.ZyronX_Dropdowns["Selecionar Rota"] then
         _G.ZyronX_Dropdowns["Selecionar Rota"]:Refresh(listaDeRotas)
     end
 end
 
--- ========================================================
 -- ROTAS TEMPORÁRIAS
--- ========================================================
 TasControls:AddToggle("Gravar", false, function(state)
     if state then
         reproduzindo = false
@@ -1271,6 +1429,7 @@ end, { Title = "Exibe a rota da rota temporária" })
 TasControls:AddButton("Reproduzir / Parar", function()
     if reproduzindo then
         reproduzindo, slotAtivo = false, nil
+        if animTrackAtual then animTrackAtual:Stop(0.2); animTrackAtual = nil; idAnimTocando = nil end
         Library:Notify({Title = "TAS", Description = "Reprodução Parada!", Duration = 3})
     else
         if #gravacaoTemporaria == 0 or not posicaoInicial then
@@ -1297,16 +1456,12 @@ TasControls:AddButton("Salvar Rota", function()
     salvarArquivoRota(nomeFinal, dadosSlot)
     atualizarListaNavegacao(nomeFinal)
     mudarVisualizerSelecionado()
-    
-    -- Atualiza a UI do Dropdown com a nova lista
     atualizarDropdownUI()
     
     Library:Notify({Title = "Sucesso", Description = "Rota salva!", Duration = 3})
 end, { Title = "Salva a rota temporária" })
 
--- ========================================================
 -- CONFIGURAÇÕES DO MOTOR
--- ========================================================
 TasConfig:AddSlider("Velocidade de Gravação", 1, 10, 10, function(val) 
     fatorSlow = val / 10
     gravarEmSlow = (fatorSlow < 1.0)
@@ -1316,13 +1471,10 @@ TasConfig:AddToggle("MoveTo", false, function(state)
     configSecurity = state
 end, { Title = "Ir até o ponto inicial automaticamente" })
 
--- ========================================================
 -- ROTAS SALVAS
--- ========================================================
 atualizarListaNavegacao()
 local rotasDropdownList = #listaDeRotas > 0 and listaDeRotas or {"Nenhuma"}
 
--- Agora criamos e armazenamos o retorno da função (que graças a modificação no source, contém o :Refresh)
 DropdownRotas = TasSaved:AddDropdown("Selecionar Rota", rotasDropdownList, false, function(selected)
     rotaSelecionada = selected
     mudarVisualizerSelecionado()
@@ -1331,6 +1483,7 @@ end, { Title = "Gerenciar rota salva", Flag = "MenuRotasTAS" })
 TasSaved:AddButton("Iniciar / Parar", function()
     if reproduzindo then
         reproduzindo, slotAtivo = false, nil
+        if animTrackAtual then animTrackAtual:Stop(0.2); animTrackAtual = nil; idAnimTocando = nil end
         Library:Notify({Title = "TAS", Description = "Reprodução Parada!", Duration = 3})
     else
         if rotaSelecionada ~= "Nenhuma" and rotasSalvas[rotaSelecionada] then
@@ -1355,8 +1508,6 @@ TasSaved:AddTextbox("Renomear", "Novo nome...", function(text)
         salvarArquivoRota(text, dadosAntigos)
         atualizarListaNavegacao(text)
         mudarVisualizerSelecionado()
-        
-        -- Atualiza a UI do Dropdown
         atualizarDropdownUI()
         
         Library:Notify({Title = "TAS", Description = "Renomeada para " .. text, Duration = 3})
@@ -1369,37 +1520,11 @@ TasSaved:AddButton("Deletar Rota", function()
         rotasSalvas[rotaSelecionada] = nil
         atualizarListaNavegacao()
         mudarVisualizerSelecionado()
-        
-        -- Atualiza a UI do Dropdown
         atualizarDropdownUI()
         
         Library:Notify({Title = "TAS", Description = "Rota apagada!", Duration = 3})
     end
 end, { Title = "Apaga a rota selecionada" })
-
---------------------------------------------------------------------
--- UTILITÁRIOS E VISUAIS
---------------------------------------------------------------------
-local TasUtilsPage = TasTab:CreatePage("Utilitários & Visuais")
-local TasVisuals = TasUtilsPage:CreateSection("Renderização de Caminho")
-TasVisuals:AddToggle("Desenhar Linha (Tracer)", true, function(state)
-    mostrarVisualizer = state
-    pastaLinhas.Parent = state and workspace or nil
-end, { Title = "Exibe o trajeto no mundo" })
-
-local TasExtra = TasUtilsPage:CreateSection("Funções Extras")
-TasExtra:AddToggle("Auto-Loop (Repetir Infinitamente)", false, function(state)
-    loopAtivo = state
-end, { Title = "Reinicia ao fim da rota" })
-
-TasExtra:AddButton("Exportar Rota (JSON)", function()
-    if rotaSelecionada ~= "Nenhuma" and rotasSalvas[rotaSelecionada] then
-        setclipboard(HttpService:JSONEncode(rotasSalvas[rotaSelecionada]))
-        Library:Notify({Title = "TAS", Description = "Copiado para a área de transferência!", Duration = 3})
-    else
-        Library:Notify({Title = "Erro", Description = "Nenhuma rota para exportar.", Duration = 3})
-    end
-end, { Title = "Copia a rota" })
 --------------------------------------------------------------------
 -- 👁️ VARIÁVEIS DO VISUAL
 --------------------------------------------------------------------
