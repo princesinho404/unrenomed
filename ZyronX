@@ -89,7 +89,7 @@ local function AddBounce(button, scaleFactor)
     end)
 end
 
--- // Utility: Draggable (Lag-Free & Fixed Memory Leak)
+-- // Utility: Draggable (Zero Lag & Direct Position Updates)
 local function MakeDraggable(topbar, object, updateCallback)
     topbar.Active = true
     object.Active = true
@@ -216,7 +216,7 @@ function Library:CreateWindow(options)
         IgnoreGuiInset = true
     })
 
-    local botaoinv = 1
+    local botaoinv = 1 -- 0.5 = Semi-transparente | 1 = Invisível | 0 = Opaco
 
     local ToggleGui = Create("ScreenGui", {
         Name = "ZyronX_Toggle_" .. uniqueID,
@@ -229,7 +229,7 @@ function Library:CreateWindow(options)
         Parent = ToggleGui,
         Name = "MobileToggleBtn",
         Size = UDim2.new(0, 45, 0, 45),
-        Position = UDim2.new(1, -50, 0, 5), 
+        Position = UDim2.new(1, -50, 0, 5),
         BackgroundColor3 = Color3.fromRGB(20, 20, 25),
         BackgroundTransparency = botaoinv,
         Text = (botaoinv >= 1) and "" or "K",
@@ -1280,36 +1280,32 @@ function Library:CreateWindow(options)
                     Create("UICorner", {Parent = P_No, CornerRadius = UDim.new(0, 4)})
                     AddBounce(P_No)
 
-                    local function RefreshMonitor()
+                    local function RefreshList()
                         for _, child in ipairs(Monitor:GetChildren()) do
                             if child:IsA("Frame") then child:Destroy() end
                         end
-                        selectedForDelete = {}
 
                         local files = _listfiles(folderName)
-                        local query = ManagerSearch.Text:lower()
+                        local searchFilter = ManagerSearch.Text:lower()
 
                         for _, filePath in ipairs(files) do
-                            local fileName = filePath:match("[^/\\]+$") or filePath
-                            fileName = fileName:gsub("%.json$", "")
+                            local fileName = filePath:match("([^/\\]+)%.json$") or filePath:match("([^/\\]+)$")
+                            if fileName and (searchFilter == "" or string.find(fileName:lower(), searchFilter)) then
+                                local ItemFrame = Create("Frame", {Parent = Monitor, BackgroundColor3 = Color3.fromRGB(22, 22, 26), Size = UDim2.new(1, 0, 0, 28)})
+                                Create("UICorner", {Parent = ItemFrame, CornerRadius = UDim.new(0, 4)})
 
-                            if query == "" or fileName:lower():find(query, 1, true) then
-                                local FileRow = Create("Frame", {Parent = Monitor, BackgroundColor3 = Color3.fromRGB(22, 22, 26), Size = UDim2.new(1, 0, 0, 26)})
-                                Create("UICorner", {Parent = FileRow, CornerRadius = UDim.new(0, 4)})
+                                local FileTxt = Create("TextLabel", {Parent = ItemFrame, Text = fileName, Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = TextColor, BackgroundTransparency = 1, Size = UDim2.new(1, -110, 1, 0), Position = UDim2.new(0, 8, 0, 0), TextXAlignment = Enum.TextXAlignment.Left})
 
-                                local FileLabel = Create("TextLabel", {Parent = FileRow, Text = fileName, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = TextColor, BackgroundTransparency = 1, Size = UDim2.new(1, -110, 1, 0), Position = UDim2.new(0, 8, 0, 0), TextXAlignment = Enum.TextXAlignment.Left})
-
-                                local LoadBtn = Create("TextButton", {Parent = FileRow, Text = "Load", Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = TextColor, BackgroundColor3 = AccentColor, Size = UDim2.new(0, 45, 0, 20), Position = UDim2.new(1, -100, 0.5, -10), AutoButtonColor = false})
+                                local LoadBtn = Create("TextButton", {Parent = ItemFrame, Text = "Load", Font = Enum.Font.GothamBold, TextSize = 10, TextColor3 = TextColor, BackgroundColor3 = AccentColor, Size = UDim2.new(0, 45, 0, 20), Position = UDim2.new(1, -100, 0.5, -10), AutoButtonColor = false})
                                 Create("UICorner", {Parent = LoadBtn, CornerRadius = UDim.new(0, 4)})
                                 AddBounce(LoadBtn)
 
-                                local EditBtn = Create("TextButton", {Parent = FileRow, Text = "Edit", Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = TextColor, BackgroundColor3 = Color3.fromRGB(50, 50, 55), Size = UDim2.new(0, 45, 0, 20), Position = UDim2.new(1, -50, 0.5, -10), AutoButtonColor = false})
+                                local EditBtn = Create("TextButton", {Parent = ItemFrame, Text = "Edit", Font = Enum.Font.GothamBold, TextSize = 10, TextColor3 = TextColor, BackgroundColor3 = Color3.fromRGB(50, 50, 55), Size = UDim2.new(0, 45, 0, 20), Position = UDim2.new(1, -50, 0.5, -10), AutoButtonColor = false})
                                 Create("UICorner", {Parent = EditBtn, CornerRadius = UDim.new(0, 4)})
                                 AddBounce(EditBtn)
 
                                 LoadBtn.MouseButton1Click:Connect(function()
-                                    local path = folderName .. "/" .. fileName .. ".json"
-                                    local content = _readfile(path)
+                                    local content = _readfile(filePath)
                                     local success, data = pcall(function() return HttpService:JSONDecode(content) end)
                                     if success and type(data) == "table" then
                                         for k, v in pairs(data) do
@@ -1317,30 +1313,26 @@ function Library:CreateWindow(options)
                                                 Window.ConfigElements[k].Set(v)
                                             end
                                         end
-                                        Library:Notify({Title = "Config Loaded", Description = "Successfully loaded '" .. fileName .. "'", Duration = 3})
+                                        Library:Notify({Title = "Config Loaded", Description = "Loaded config: " .. fileName, Duration = 3})
                                     end
                                 end)
 
                                 EditBtn.MouseButton1Click:Connect(function()
                                     editMode = true
-                                    editTargetFile = fileName
+                                    editTargetFile = filePath
                                     NameBox.Text = fileName
-                                    CreateBtn.Visible = false
-                                    DeleteTogBtn.Visible = false
-                                    ActionArea.Visible = true
-                                    ConfirmActionBtn.Text = "Save Edit"
-                                    ConfirmActionBtn.BackgroundColor3 = AccentColor
+                                    CreateBtn.Text = "Save Edit"
+                                    ActionArea.Visible = false
                                 end)
 
-                                FileRow.InputBegan:Connect(function(input)
+                                ItemFrame.InputBegan:Connect(function(input)
                                     if deleteMode and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-                                        local idx = table.find(selectedForDelete, fileName)
-                                        if idx then
-                                            table.remove(selectedForDelete, idx)
-                                            FileRow.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+                                        if table.find(selectedForDelete, filePath) then
+                                            table.remove(selectedForDelete, table.find(selectedForDelete, filePath))
+                                            ItemFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
                                         else
-                                            table.insert(selectedForDelete, fileName)
-                                            FileRow.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+                                            table.insert(selectedForDelete, filePath)
+                                            ItemFrame.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
                                         end
                                     end
                                 end)
@@ -1348,31 +1340,72 @@ function Library:CreateWindow(options)
                         end
                     end
 
-                    ManagerSearch:GetPropertyChangedSignal("Text"):Connect(RefreshMonitor)
+                    ManagerSearch:GetPropertyChangedSignal("Text"):Connect(RefreshList)
 
                     CreateBtn.MouseButton1Click:Connect(function()
-                        local name = NameBox.Text ~= "" and NameBox.Text or "default_config"
-                        local data = {}
+                        local saveName = NameBox.Text
+                        if saveName == "" then return end
+
+                        local savePath = folderName .. "/" .. saveName .. ".json"
+                        local dataToSave = {}
                         for k, elem in pairs(Window.ConfigElements) do
-                            data[k] = elem.Get()
+                            dataToSave[k] = elem.Get()
                         end
-                        local json = HttpService:JSONEncode(data)
-                        _writefile(folderName .. "/" .. name .. ".json", json)
+
+                        local json = HttpService:JSONEncode(dataToSave)
+                        _writefile(savePath, json)
+
+                        -- Atualização de Dropdowns
+                        if _G.ZyronX_Dropdowns then
+                            local files = _listfiles(folderName)
+                            local fileNames = {}
+                            for _, fp in ipairs(files) do
+                                local fn = fp:match("([^/\\]+)%.json$") or fp:match("([^/\\]+)$")
+                                if fn then table.insert(fileNames, fn) end
+                            end
+                            for dropName, dropApi in pairs(_G.ZyronX_Dropdowns) do
+                                if dropApi and dropApi.Refresh then
+                                    dropApi:Refresh(fileNames)
+                                end
+                            end
+                        end
+
                         NameBox.Text = ""
-                        RefreshMonitor()
-                        Library:Notify({Title = "Config Saved", Description = "Saved configuration as '" .. name .. "'", Duration = 3})
+                        if editMode then
+                            editMode = false
+                            CreateBtn.Text = "Create Save"
+                        end
+                        RefreshList()
+                        Library:Notify({Title = "Config Saved", Description = "Saved config: " .. saveName, Duration = 3})
                     end)
 
                     DeleteTogBtn.MouseButton1Click:Connect(function()
                         deleteMode = not deleteMode
-                        DeleteTogBtn.Text = deleteMode and "Delete Mode: ON" or "Delete Mode: OFF"
-                        DeleteTogBtn.BackgroundColor3 = deleteMode and Color3.fromRGB(180, 50, 50) or Color3.fromRGB(45, 45, 50)
+                        selectedForDelete = {}
                         if deleteMode then
+                            DeleteTogBtn.Text = "Delete Mode: ON"
+                            DeleteTogBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+                            ActionArea.Visible = true
                             CreateBtn.Visible = false
                             DeleteTogBtn.Visible = false
-                            ActionArea.Visible = true
-                            ConfirmActionBtn.Text = "Delete Selected"
-                            ConfirmActionBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+                        else
+                            DeleteTogBtn.Text = "Delete Mode: OFF"
+                            DeleteTogBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+                            ActionArea.Visible = false
+                            CreateBtn.Visible = true
+                            DeleteTogBtn.Visible = true
+                        end
+                        RefreshList()
+                    end)
+
+                    ConfirmActionBtn.MouseButton1Click:Connect(function()
+                        if #selectedForDelete > 0 then
+                            InternalConfirmPopup.Visible = true
+                            Tween(InternalConfirmPopup, {BackgroundTransparency = 0}, 0.2)
+                            Tween(P_Title, {TextTransparency = 0}, 0.2)
+                            Tween(P_Desc, {TextTransparency = 0}, 0.2)
+                            Tween(P_Yes, {BackgroundTransparency = 0, TextTransparency = 0}, 0.2)
+                            Tween(P_No, {BackgroundTransparency = 0, TextTransparency = 0}, 0.2)
                         end
                     end)
 
@@ -1381,56 +1414,65 @@ function Library:CreateWindow(options)
                         editMode = false
                         selectedForDelete = {}
                         NameBox.Text = ""
-                        CreateBtn.Visible = true
-                        DeleteTogBtn.Visible = true
+                        CreateBtn.Text = "Create Save"
                         DeleteTogBtn.Text = "Delete Mode: OFF"
                         DeleteTogBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
                         ActionArea.Visible = false
-                        RefreshMonitor()
-                    end)
-
-                    ConfirmActionBtn.MouseButton1Click:Connect(function()
-                        if editMode then
-                            local newName = NameBox.Text
-                            if newName ~= "" and newName ~= editTargetFile then
-                                local oldPath = folderName .. "/" .. editTargetFile .. ".json"
-                                local newPath = folderName .. "/" .. newName .. ".json"
-                                local content = _readfile(oldPath)
-                                _writefile(newPath, content)
-                                _delfile(oldPath)
-                            end
-                            CancelActionBtn:MouseButton1Click()
-                        elseif deleteMode then
-                            if #selectedForDelete > 0 then
-                                InternalConfirmPopup.Visible = true
-                                Tween(InternalConfirmPopup, {BackgroundTransparency = 0.1}, 0.2)
-                                Tween(P_Title, {TextTransparency = 0}, 0.2)
-                                Tween(P_Desc, {TextTransparency = 0}, 0.2)
-                                Tween(P_Yes, {BackgroundTransparency = 0, TextTransparency = 0}, 0.2)
-                                Tween(P_No, {BackgroundTransparency = 0, TextTransparency = 0}, 0.2)
-                            end
-                        end
+                        CreateBtn.Visible = true
+                        DeleteTogBtn.Visible = true
+                        RefreshList()
                     end)
 
                     P_Yes.MouseButton1Click:Connect(function()
-                        for _, name in ipairs(selectedForDelete) do
-                            _delfile(folderName .. "/" .. name .. ".json")
+                        for _, fp in ipairs(selectedForDelete) do
+                            _delfile(fp)
                         end
+                        selectedForDelete = {}
                         InternalConfirmPopup.Visible = false
-                        CancelActionBtn:MouseButton1Click()
+                        deleteMode = false
+                        DeleteTogBtn.Text = "Delete Mode: OFF"
+                        DeleteTogBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+                        ActionArea.Visible = false
+                        CreateBtn.Visible = true
+                        DeleteTogBtn.Visible = true
+
+                        -- Atualização de Dropdowns
+                        if _G.ZyronX_Dropdowns then
+                            local files = _listfiles(folderName)
+                            local fileNames = {}
+                            for _, fp in ipairs(files) do
+                                local fn = fp:match("([^/\\]+)%.json$") or fp:match("([^/\\]+)$")
+                                if fn then table.insert(fileNames, fn) end
+                            end
+                            for dropName, dropApi in pairs(_G.ZyronX_Dropdowns) do
+                                if dropApi and dropApi.Refresh then
+                                    dropApi:Refresh(fileNames)
+                                end
+                            end
+                        end
+
+                        RefreshList()
+                        Library:Notify({Title = "Deleted", Description = "Selected configs deleted.", Duration = 3})
                     end)
 
                     P_No.MouseButton1Click:Connect(function()
                         InternalConfirmPopup.Visible = false
                     end)
 
-                    RefreshMonitor()
+                    RefreshList()
                 end
 
                 return Elements
             end
 
             return PageObj
+        end
+
+        if isDefault and not Window.CurrentTab then
+            task.spawn(function()
+                task.wait(0.1)
+                TabBtn.MouseButton1Click:Fire()
+            end)
         end
 
         return TabConfig
