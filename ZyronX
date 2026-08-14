@@ -90,12 +90,12 @@ local function AddBounce(button, scaleFactor)
     end)
 end
 
--- // Utility: Draggable (Fixed Memory Leak)
+-- // Utility: Draggable (Fixed Memory Leak & Mouse Lag)
 local function MakeDraggable(topbar, object)
     topbar.Active = true
     object.Active = true
-    local dragging, dragInput, dragStart, startPos
-    local dragEndConnection
+    local dragging, dragStart, startPos
+    local moveConnection, dragEndConnection
     
     topbar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -103,29 +103,27 @@ local function MakeDraggable(topbar, object)
             dragStart = input.Position
             startPos = object.Position
             
+            -- Conecta o movimento APENAS enquanto o clique estiver segurado
+            if moveConnection then moveConnection:Disconnect() end
+            moveConnection = UserInputService.InputChanged:Connect(function(moveInput)
+                if dragging and (moveInput.UserInputType == Enum.UserInputType.MouseMovement or moveInput.UserInputType == Enum.UserInputType.Touch) then
+                    local delta = moveInput.Position - dragStart
+                    Tween(object, {Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)}, 0.08)
+                end
+            end)
+
             if dragEndConnection then dragEndConnection:Disconnect() end
             dragEndConnection = input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
-                    if dragEndConnection then
+                    -- Limpa os eventos para não travar o jogo
+                    if moveConnection then moveConnection:Disconnect() end
+                    if dragEndConnection then 
                         dragEndConnection:Disconnect()
-                        dragEndConnection = nil
+                        dragEndConnection = nil 
                     end
                 end
             end)
-        end
-    end)
-    
-    topbar.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-    
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            Tween(object, {Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)}, 0.08)
         end
     end)
 end
@@ -1105,121 +1103,165 @@ function Library:CreateWindow(options)
                 end
 
                 function Elements:AddColorPicker(name, defaultColor, callback, infoData)
-                    local color = defaultColor or Color3.fromRGB(255, 255, 255)
-                    local h, s, v_hsv = color:ToHSV()
-                    local dropped = false
-                    
-                    local CFrame = Create("Frame", {Parent = ItemContainer, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30), ClipsDescendants = true, ZIndex = 9})
-                    Create("TextLabel", {Parent = CFrame, Text = name, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(1, -60, 0, 30), Position = UDim2.new(0, 10, 0, 0), TextXAlignment = Enum.TextXAlignment.Left})
-                    
-                    local DisplayBtn = Create("TextButton", {Parent = CFrame, Text = "", BackgroundColor3 = color, Size = UDim2.new(0, 30, 0, 16), Position = UDim2.new(1, -40, 0.5, -8), AutoButtonColor = false})
-                    Create("UICorner", {Parent = DisplayBtn, CornerRadius = UDim.new(0, 4)})
-                    Create("UIStroke", {Parent = DisplayBtn, Color = Color3.fromRGB(255,255,255), Transparency = 0.8, Thickness = 1})
-                    AddBounce(DisplayBtn)
+    local color = defaultColor or Color3.fromRGB(255, 255, 255)
+    local h, s, v_hsv = color:ToHSV()
+    local dropped = false
+    
+    local CFrame = Create("Frame", {Parent = ItemContainer, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30), ClipsDescendants = true, ZIndex = 9})
+    Create("TextLabel", {Parent = CFrame, Text = name, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = SubTextColor, BackgroundTransparency = 1, Size = UDim2.new(1, -60, 0, 30), Position = UDim2.new(0, 10, 0, 0), TextXAlignment = Enum.TextXAlignment.Left})
+    
+    local DisplayBtn = Create("TextButton", {Parent = CFrame, Text = "", BackgroundColor3 = color, Size = UDim2.new(0, 30, 0, 16), Position = UDim2.new(1, -40, 0.5, -8), AutoButtonColor = false})
+    Create("UICorner", {Parent = DisplayBtn, CornerRadius = UDim.new(0, 4)})
+    Create("UIStroke", {Parent = DisplayBtn, Color = Color3.fromRGB(255,255,255), Transparency = 0.8, Thickness = 1})
+    AddBounce(DisplayBtn)
 
-                    local PickerArea = Create("Frame", {Parent = CFrame, BackgroundColor3 = BackgroundColor, Size = UDim2.new(1, -20, 0, 170), Position = UDim2.new(0, 10, 0, 35)})
-                    Create("UICorner", {Parent = PickerArea, CornerRadius = UDim.new(0, 4)})
+    local PickerArea = Create("Frame", {Parent = CFrame, BackgroundColor3 = BackgroundColor, Size = UDim2.new(1, -20, 0, 170), Position = UDim2.new(0, 10, 0, 35)})
+    Create("UICorner", {Parent = PickerArea, CornerRadius = UDim.new(0, 4)})
 
-                    local PickerClose = Create("TextButton", {Parent = PickerArea, Text = "X", Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = SubTextColor, BackgroundColor3 = Color3.fromRGB(30, 20, 20), Size = UDim2.new(0, 18, 0, 18), Position = UDim2.new(1, -22, 0, 4), ZIndex = 50, AutoButtonColor = false})
-                    Create("UICorner", {Parent = PickerClose, CornerRadius = UDim.new(0, 4)})
-                    AddBounce(PickerClose)
-                    
-                    PickerClose.MouseEnter:Connect(function() Tween(PickerClose, {TextColor3 = Color3.fromRGB(255, 60, 60)}, 0.2) end)
-                    PickerClose.MouseLeave:Connect(function() Tween(PickerClose, {TextColor3 = SubTextColor}, 0.2) end)
-                    PickerClose.MouseButton1Click:Connect(function() dropped = false CFrame.ZIndex = 9 Tween(CFrame, {Size = UDim2.new(1, 0, 0, 30)}, 0.3) end)
+    local PickerClose = Create("TextButton", {Parent = PickerArea, Text = "X", Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = SubTextColor, BackgroundColor3 = Color3.fromRGB(30, 20, 20), Size = UDim2.new(0, 18, 0, 18), Position = UDim2.new(1, -22, 0, 4), ZIndex = 50, AutoButtonColor = false})
+    Create("UICorner", {Parent = PickerClose, CornerRadius = UDim.new(0, 4)})
+    AddBounce(PickerClose)
+    
+    PickerClose.MouseEnter:Connect(function() Tween(PickerClose, {TextColor3 = Color3.fromRGB(255, 60, 60)}, 0.2) end)
+    PickerClose.MouseLeave:Connect(function() Tween(PickerClose, {TextColor3 = SubTextColor}, 0.2) end)
+    PickerClose.MouseButton1Click:Connect(function() dropped = false CFrame.ZIndex = 9 Tween(CFrame, {Size = UDim2.new(1, 0, 0, 30)}, 0.3) end)
 
-                    local SVMap = Create("TextButton", {Parent = PickerArea, Text = "", BackgroundColor3 = Color3.fromHSV(h, 1, 1), Size = UDim2.new(1, -45, 0, 90), Position = UDim2.new(0, 10, 0, 10), AutoButtonColor = false, Active = true})
-                    Create("UICorner", {Parent = SVMap, CornerRadius = UDim.new(0, 4)})
-                    
-                    local WhiteGrad = Create("Frame", {Parent = SVMap, Size = UDim2.new(1,0,1,0), BackgroundColor3 = Color3.new(1,1,1), ZIndex = 2})
-                    Create("UIGradient", {Parent = WhiteGrad, Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)}), Rotation = 0})
-                    Create("UICorner", {Parent = WhiteGrad, CornerRadius = UDim.new(0, 4)})
+    local SVMap = Create("TextButton", {Parent = PickerArea, Text = "", BackgroundColor3 = Color3.fromHSV(h, 1, 1), Size = UDim2.new(1, -45, 0, 90), Position = UDim2.new(0, 10, 0, 10), AutoButtonColor = false, Active = true})
+    Create("UICorner", {Parent = SVMap, CornerRadius = UDim.new(0, 4)})
+    
+    local WhiteGrad = Create("Frame", {Parent = SVMap, Size = UDim2.new(1,0,1,0), BackgroundColor3 = Color3.new(1,1,1), ZIndex = 2})
+    Create("UIGradient", {Parent = WhiteGrad, Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)}), Rotation = 0})
+    Create("UICorner", {Parent = WhiteGrad, CornerRadius = UDim.new(0, 4)})
 
-                    local BlackGrad = Create("Frame", {Parent = SVMap, Size = UDim2.new(1,0,1,0), BackgroundColor3 = Color3.new(0,0,0), ZIndex = 3})
-                    Create("UIGradient", {Parent = BlackGrad, Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0)}), Rotation = 90})
-                    Create("UICorner", {Parent = BlackGrad, CornerRadius = UDim.new(0, 4)})
+    local BlackGrad = Create("Frame", {Parent = SVMap, Size = UDim2.new(1,0,1,0), BackgroundColor3 = Color3.new(0,0,0), ZIndex = 3})
+    Create("UIGradient", {Parent = BlackGrad, Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0)}), Rotation = 90})
+    Create("UICorner", {Parent = BlackGrad, CornerRadius = UDim.new(0, 4)})
 
-                    local SVRing = Create("Frame", {Parent = BlackGrad, Size = UDim2.new(0, 10, 0, 10), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(s, 0, 1-v_hsv, 0), BackgroundColor3 = Color3.new(1,1,1), ZIndex = 4})
-                    Create("UICorner", {Parent = SVRing, CornerRadius = UDim.new(1, 0)})
-                    Create("UIStroke", {Parent = SVRing, Color = Color3.new(0,0,0), Thickness = 1})
+    local SVRing = Create("Frame", {Parent = BlackGrad, Size = UDim2.new(0, 10, 0, 10), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(s, 0, 1-v_hsv, 0), BackgroundColor3 = Color3.new(1,1,1), ZIndex = 4})
+    Create("UICorner", {Parent = SVRing, CornerRadius = UDim.new(1, 0)})
+    Create("UIStroke", {Parent = SVRing, Color = Color3.new(0,0,0), Thickness = 1})
 
-                    local HueSlider = Create("TextButton", {Parent = PickerArea, Text = "", Size = UDim2.new(1, -20, 0, 15), Position = UDim2.new(0, 10, 0, 110), AutoButtonColor = false, BackgroundColor3 = Color3.new(1,1,1), Active = true})
-                    Create("UICorner", {Parent = HueSlider, CornerRadius = UDim.new(0, 4)})
-                    local HueGradient = Create("UIGradient", {Parent = HueSlider, Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255, 255, 0)), ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0, 255, 0)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)), ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0, 0, 255)), ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255, 0, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))})})
-                    local HueRing = Create("Frame", {Parent = HueSlider, Size = UDim2.new(0, 6, 0, 15), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(h, 0, 0.5, 0), BackgroundColor3 = Color3.new(1,1,1)})
-                    Create("UICorner", {Parent = HueRing, CornerRadius = UDim.new(0, 2)})
-                    Create("UIStroke", {Parent = HueRing, Color = Color3.new(0,0,0), Thickness = 1})
-                    
-                    local initialRGB = string.format("%d, %d, %d", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
-                    local RGBInput = Create("TextBox", {Parent = PickerArea, Text = initialRGB, PlaceholderText = "R, G, B", Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = TextColor, BackgroundColor3 = Color3.fromRGB(25, 25, 30), Size = UDim2.new(1, -20, 0, 24), Position = UDim2.new(0, 10, 0, 135), ClearTextOnFocus = false})
-                    Create("UICorner", {Parent = RGBInput, CornerRadius = UDim.new(0, 4)})
-                    Create("UIStroke", {Parent = RGBInput, Color = Color3.fromRGB(50, 50, 55), Thickness = 1})
+    local HueSlider = Create("TextButton", {Parent = PickerArea, Text = "", Size = UDim2.new(1, -20, 0, 15), Position = UDim2.new(0, 10, 0, 110), AutoButtonColor = false, BackgroundColor3 = Color3.new(1,1,1), Active = true})
+    Create("UICorner", {Parent = HueSlider, CornerRadius = UDim.new(0, 4)})
+    local HueGradient = Create("UIGradient", {Parent = HueSlider, Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255, 255, 0)), ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0, 255, 0)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)), ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0, 0, 255)), ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255, 0, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))})})
+    local HueRing = Create("Frame", {Parent = HueSlider, Size = UDim2.new(0, 6, 0, 15), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(h, 0, 0.5, 0), BackgroundColor3 = Color3.new(1,1,1)})
+    Create("UICorner", {Parent = HueRing, CornerRadius = UDim.new(0, 2)})
+    Create("UIStroke", {Parent = HueRing, Color = Color3.new(0,0,0), Thickness = 1})
+    
+    local initialRGB = string.format("%d, %d, %d", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
+    local RGBInput = Create("TextBox", {Parent = PickerArea, Text = initialRGB, PlaceholderText = "R, G, B", Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = TextColor, BackgroundColor3 = Color3.fromRGB(25, 25, 30), Size = UDim2.new(1, -20, 0, 24), Position = UDim2.new(0, 10, 0, 135), ClearTextOnFocus = false})
+    Create("UICorner", {Parent = RGBInput, CornerRadius = UDim.new(0, 4)})
+    Create("UIStroke", {Parent = RGBInput, Color = Color3.fromRGB(50, 50, 55), Thickness = 1})
 
-                    local function internalSet(hexString)
-                        local s_check, c = pcall(function() return Color3.fromHex(hexString) end)
-                        if s_check then
-                            color = c
-                            h, s, v_hsv = color:ToHSV()
-                            DisplayBtn.BackgroundColor3 = color
-                            SVMap.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-                            SVRing.Position = UDim2.new(s, 0, 1-v_hsv, 0)
-                            HueRing.Position = UDim2.new(h, 0, 0.5, 0)
-                            RGBInput.Text = string.format("%d, %d, %d", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
-                            if callback then callback(color) end
-                        end
-                    end
+    local function internalSet(hexString)
+        local s_check, c = pcall(function() return Color3.fromHex(hexString) end)
+        if s_check then
+            color = c
+            h, s, v_hsv = color:ToHSV()
+            DisplayBtn.BackgroundColor3 = color
+            SVMap.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+            SVRing.Position = UDim2.new(s, 0, 1-v_hsv, 0)
+            HueRing.Position = UDim2.new(h, 0, 0.5, 0)
+            RGBInput.Text = string.format("%d, %d, %d", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
+            if callback then callback(color) end
+        end
+    end
 
-                    RGBInput.FocusLost:Connect(function()
-                        local r, g, b = string.match(RGBInput.Text, "(%d+)%D+(%d+)%D+(%d+)")
-                        if r and g and b then
-                            r = math.clamp(tonumber(r), 0, 255)
-                            g = math.clamp(tonumber(g), 0, 255)
-                            b = math.clamp(tonumber(b), 0, 255)
-                            local newColor = Color3.fromRGB(r, g, b)
-                            internalSet(newColor:ToHex())
-                        else
-                            RGBInput.Text = string.format("%d, %d, %d", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
-                        end
-                    end)
+    RGBInput.FocusLost:Connect(function()
+        local r, g, b = string.match(RGBInput.Text, "(%d+)%D+(%d+)%D+(%d+)")
+        if r and g and b then
+            r = math.clamp(tonumber(r), 0, 255)
+            g = math.clamp(tonumber(g), 0, 255)
+            b = math.clamp(tonumber(b), 0, 255)
+            local newColor = Color3.fromRGB(r, g, b)
+            internalSet(newColor:ToHex())
+        else
+            RGBInput.Text = string.format("%d, %d, %d", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
+        end
+    end)
 
-                    local function UpdateColor()
-                        color = Color3.fromHSV(h, s, v_hsv)
-                        DisplayBtn.BackgroundColor3 = color
-                        SVMap.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-                        RGBInput.Text = string.format("%d, %d, %d", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
-                        if callback then callback(color) end
-                    end
+    local function UpdateColor()
+        color = Color3.fromHSV(h, s, v_hsv)
+        DisplayBtn.BackgroundColor3 = color
+        SVMap.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+        RGBInput.Text = string.format("%d, %d, %d", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
+        if callback then callback(color) end
+    end
 
-                    local draggingSV = false
-                    local draggingHue = false
-                    
-                    SVMap.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingSV = true if PageObj and PageObj.Scroll then PageObj.Scroll.ScrollingEnabled = false end end end)
-                    HueSlider.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingHue = true if PageObj and PageObj.Scroll then PageObj.Scroll.ScrollingEnabled = false end end end)
-                    UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingSV = false draggingHue = false if PageObj and PageObj.Scroll then PageObj.Scroll.ScrollingEnabled = true end end end)
+    -- // Lógica de arrasto otimizada (sem memory leaks e sem travar ao mover o mouse)
+    local moveConn, releaseConn
 
-                    UserInputService.InputChanged:Connect(function(input)
-                        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-                            if draggingSV then
-                                local relX = math.clamp((input.Position.X - SVMap.AbsolutePosition.X) / SVMap.AbsoluteSize.X, 0, 1)
-                                local relY = math.clamp((input.Position.Y - SVMap.AbsolutePosition.Y) / SVMap.AbsoluteSize.Y, 0, 1)
-                                s = relX
-                                v_hsv = 1 - relY
-                                SVRing.Position = UDim2.new(s, 0, 1-v_hsv, 0)
-                                UpdateColor()
-                            elseif draggingHue then
-                                local relX = math.clamp((input.Position.X - HueSlider.AbsolutePosition.X) / HueSlider.AbsoluteSize.X, 0, 1)
-                                h = relX
-                                HueRing.Position = UDim2.new(h, 0, 0.5, 0)
-                                UpdateColor()
-                            end
-                        end
-                    end)
+    SVMap.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if PageObj and PageObj.Scroll then PageObj.Scroll.ScrollingEnabled = false end
 
-                    DisplayBtn.MouseButton1Click:Connect(function() dropped = not dropped if dropped then CFrame.ZIndex = 49 else CFrame.ZIndex = 9 end Tween(CFrame, {Size = UDim2.new(1, 0, 0, dropped and 215 or 30)}, 0.3) end)
-                    AddInfoIcon(CFrame, UDim2.new(1, -65, 0, 7), infoData)
+            local function updateSV(inp)
+                local relX = math.clamp((inp.Position.X - SVMap.AbsolutePosition.X) / SVMap.AbsoluteSize.X, 0, 1)
+                local relY = math.clamp((inp.Position.Y - SVMap.AbsolutePosition.Y) / SVMap.AbsoluteSize.Y, 0, 1)
+                s = relX
+                v_hsv = 1 - relY
+                SVRing.Position = UDim2.new(s, 0, 1 - v_hsv, 0)
+                UpdateColor()
+            end
 
-                    Window.ConfigElements[name] = { Set = internalSet, Get = function() return color:ToHex() end }
+            updateSV(input)
+
+            if moveConn then moveConn:Disconnect() end
+            if releaseConn then releaseConn:Disconnect() end
+
+            moveConn = UserInputService.InputChanged:Connect(function(moveInput)
+                if moveInput.UserInputType == Enum.UserInputType.MouseMovement or moveInput.UserInputType == Enum.UserInputType.Touch then
+                    updateSV(moveInput)
                 end
+            end)
+
+            releaseConn = UserInputService.InputEnded:Connect(function(endInput)
+                if endInput.UserInputType == Enum.UserInputType.MouseButton1 or endInput.UserInputType == Enum.UserInputType.Touch then
+                    if moveConn then moveConn:Disconnect() end
+                    if releaseConn then releaseConn:Disconnect() end
+                    if PageObj and PageObj.Scroll then PageObj.Scroll.ScrollingEnabled = true end
+                end
+            end)
+        end
+    end)
+
+    HueSlider.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if PageObj and PageObj.Scroll then PageObj.Scroll.ScrollingEnabled = false end
+
+            local function updateHue(inp)
+                local relX = math.clamp((inp.Position.X - HueSlider.AbsolutePosition.X) / HueSlider.AbsoluteSize.X, 0, 1)
+                h = relX
+                HueRing.Position = UDim2.new(h, 0, 0.5, 0)
+                UpdateColor()
+            end
+
+            updateHue(input)
+
+            if moveConn then moveConn:Disconnect() end
+            if releaseConn then releaseConn:Disconnect() end
+
+            moveConn = UserInputService.InputChanged:Connect(function(moveInput)
+                if moveInput.UserInputType == Enum.UserInputType.MouseMovement or moveInput.UserInputType == Enum.UserInputType.Touch then
+                    updateHue(moveInput)
+                end
+            end)
+
+            releaseConn = UserInputService.InputEnded:Connect(function(endInput)
+                if endInput.UserInputType == Enum.UserInputType.MouseButton1 or endInput.UserInputType == Enum.UserInputType.Touch then
+                    if moveConn then moveConn:Disconnect() end
+                    if releaseConn then releaseConn:Disconnect() end
+                    if PageObj and PageObj.Scroll then PageObj.Scroll.ScrollingEnabled = true end
+                end
+            end)
+        end
+    end)
+
+    DisplayBtn.MouseButton1Click:Connect(function() dropped = not dropped if dropped then CFrame.ZIndex = 49 else CFrame.ZIndex = 9 end Tween(CFrame, {Size = UDim2.new(1, 0, 0, dropped and 215 or 30)}, 0.3) end)
+    AddInfoIcon(CFrame, UDim2.new(1, -65, 0, 7), infoData)
+
+    Window.ConfigElements[name] = { Set = internalSet, Get = function() return color:ToHex() end }
+end
 
                 function Elements:AddConfigManager(folderName)
                     folderName = folderName or "zyronxSavers"
