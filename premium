@@ -17,7 +17,7 @@ local Window = Library:CreateWindow({
     
     SphereText = false, 
     SphereWords = "EB", 
-    SphereImage = "rbxassetid://5013109572",
+    SphereImage = "rbxassetid://121574485496082",
     SphereIconSize = 38
 })
 
