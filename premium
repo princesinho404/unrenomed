@@ -58,14 +58,6 @@ AppearanceCard:AddToggle("Interface transparente", false, function(state)
     Window:SetTransparency(state and 0.2 or 0) 
 end, 
 {Title = "Transparência", Description = "Deixa a interface transparente"})
-AppearanceCard:AddToggle("Modo Anonimo", false, function(state) 
-    if state then
-        btnJogador:Set("Jogador: [ Anônimo ]")
-    else
-     btnJogador:Set("Jogador: " .. LocalPlayer.Name)
-    end
-end, 
-{ Title = "Modo Anônimo", Description = "Oculta o seu nick na interface"})
 -- ========================================== --
 -- ⚙️ SERVIÇOS E VARIÁVEIS BASE
 -- ========================================== --
@@ -73,8 +65,13 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local VIM
+pcall(function() VIM = game:GetService("VirtualInputManager") end)
 
 local player = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
@@ -91,6 +88,8 @@ local tempoDecorrido = 0
 local slotAtivo = nil
 local delayInicio = 0
 local configSecurity = false -- false = Usa o Dummy Verde, true = Vai direto ao ponto
+local mostrarLinhas = false
+local dummiesAtivos = {}
 
 local animTrackAtual = nil
 local idAnimTocando = nil
@@ -101,9 +100,11 @@ local cacheAnimacoes = {}
 -- ========================================== --
 local DeltaTab = Window:CreateTab("EB do Delta", false, false)
 
--- // PÁGINA: Parkours & Torres
+-- // PÁGINAS
 local Parkours_Page = DeltaTab:CreatePage("Parkours")
 local Torres_Page = DeltaTab:CreatePage("Torres")
+local Config_Page = DeltaTab:CreatePage("Configurações")
+local Havac_Page = DeltaTab:CreatePage("Automações")
 
 -- Links RAW dos Trajetos (Agora apenas o Grupo A)
 local RAW_URLS = {
@@ -149,6 +150,78 @@ local RAW_URLS = {
 }
 
 -- ========================================== --
+-- 🛑 FUNÇÕES DE CAMINHADA E PARADA
+-- ========================================== --
+local function ForcarCaminhada(posAlvoExata, targetCF)
+    local distancia = (rootPart.Position - posAlvoExata).Magnitude
+    if distancia > 1.5 then
+        humanoid:MoveTo(posAlvoExata)
+        local chegou = false
+        local conexao
+        conexao = humanoid.MoveToFinished:Connect(function()
+            chegou = true
+            if conexao then conexao:Disconnect() end
+        end)
+        local inicioEspera = os.clock()
+        local tempoMax = (distancia / 16) + 3 
+        while not chegou and (os.clock() - inicioEspera < tempoMax) do
+            if (rootPart.Position - posAlvoExata).Magnitude <= 1.5 then
+                chegou = true
+                break
+            end
+            task.wait()
+        end
+        if conexao and conexao.Connected then conexao:Disconnect() end
+
+        humanoid.AutoRotate = false
+        rootPart.AssemblyLinearVelocity = Vector3.zero
+        rootPart.AssemblyAngularVelocity = Vector3.zero
+        TweenService:Create(rootPart, TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = targetCF}):Play()
+        task.wait(0.12)
+        humanoid.AutoRotate = true
+    else
+        rootPart.CFrame = targetCF
+        task.wait(0.02)
+        rootPart.AssemblyLinearVelocity = Vector3.zero
+        rootPart.AssemblyAngularVelocity = Vector3.zero
+    end
+end
+
+local function pararReproducao()
+    reproduzindo = false
+    slotAtivo = nil
+    
+    if animTrackAtual then
+        animTrackAtual:Stop(0.2)
+        animTrackAtual = nil
+        idAnimTocando = nil
+    end
+    
+    if humanoid then
+        humanoid.WalkSpeed = 16
+        rootPart.AssemblyLinearVelocity = Vector3.zero
+    end
+    
+    if character then
+        local animateScript = character:FindFirstChild("Animate")
+        if animateScript then animateScript.Disabled = false end
+    end
+    
+    if humanoid then
+        humanoid:ChangeState(Enum.HumanoidStateType.Landed)
+    end
+end
+
+local function limparDummies()
+    if type(dummiesAtivos) == "table" then
+        for _, dummy in ipairs(dummiesAtivos) do
+            if typeof(dummy) == "Instance" then dummy:Destroy() end
+        end
+        table.clear(dummiesAtivos)
+    end
+end
+
+-- ========================================== --
 -- 🔄 LOOP PRINCIPAL DE REPRODUÇÃO (POST-SIMULATION)
 -- ========================================== --
 RunService.PostSimulation:Connect(function(deltaTime)
@@ -167,15 +240,7 @@ RunService.PostSimulation:Connect(function(deltaTime)
         local tempoFinal = slotAtivo.tempoTotal or historico[#historico].tempo
         
         if tempoDecorrido >= tempoFinal then
-            reproduzindo, slotAtivo = false, nil
-            
-            if animTrackAtual then
-                animTrackAtual:Stop(0.2)
-                animTrackAtual = nil
-                idAnimTocando = nil
-            end
-            
-            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+            pararReproducao()
             Library:Notify({Title = "Parkour", Description = "Trajeto Concluído!", Duration = 3})
         else
             rootPart.AssemblyLinearVelocity = Vector3.new(dadosAlvo.velX, dadosAlvo.velY, dadosAlvo.velZ)
@@ -354,6 +419,7 @@ local function iniciarTrajetoHavac(slot)
             end
             
             dummy.Parent = workspace
+            table.insert(dummiesAtivos, dummy)
         end)
 
         local conectado = nil
@@ -406,15 +472,58 @@ local function iniciarTrajetoHavac(slot)
 end
 
 -- ========================================== --
--- 🌐 EXECUÇÃO E REQUISIÇÃO RAW
+-- 🌐 SISTEMA DE CACHE E EXECUÇÃO RAW
 -- ========================================== --
+local cacheRotas = {}
+
+-- Robô invisível: Baixa tudo pro Cache assim que o script for injetado
+task.spawn(function()
+    for catName, categoria in pairs(RAW_URLS) do
+        for identifier, versoes in pairs(categoria) do
+            for versao, url in pairs(versoes) do
+                if url and url ~= "" and url:sub(1, 4) == "http" then
+                    task.spawn(function()
+                        local s, r = pcall(function() return game:HttpGet(url) end)
+                        if s and r and r ~= "" then
+                            local sJson, dJson = pcall(function() return HttpService:JSONDecode(r) end)
+                            if sJson and dJson then
+                                if type(dJson) == "table" and dJson[1] and dJson[1].dados then 
+                                    dJson = dJson[1] 
+                                end
+                                local cacheKey = catName .. "_" .. identifier .. "_" .. versao
+                                cacheRotas[cacheKey] = dJson
+                            end
+                        end
+                    end)
+                end
+            end
+        end
+    end
+end)
+
 local function executarRota(categoria, identifier, versao)
-    local url = ""
+    -- REGRA: Se já estiver tocando, o botão serve para parar a rota!
+    if reproduzindo then
+        pararReproducao()
+        Library:Notify({Title = "Parado", Description = "Reprodução cancelada.", Duration = 3})
+        return
+    end
+
+    local cacheKey = categoria .. "_" .. identifier .. "_" .. versao
     
+    -- VERIFICAÇÃO DE CACHE: Se já tiver baixado, vai instantâneo
+    if cacheRotas[cacheKey] then
+        Library:Notify({Title = "Sucesso", Description = "Iniciando trajeto instantaneamente!", Duration = 2})
+        iniciarTrajetoHavac(cacheRotas[cacheKey])
+        return
+    end
+
+    -- FALLBACK: Se sua internet for mais lenta que o clique e não baixou no fundo, baixa agora
+    local url = ""
     if categoria == "Parkours" then
-        url = RAW_URLS["Parkours"][identifier][versao]
+        url = RAW_URLS["Parkours"][identifier] and RAW_URLS["Parkours"][identifier][versao]
     else
-        url = RAW_URLS["Torres"][identifier][versao]
+        url = RAW_URLS["Torres"][identifier] and RAW_URLS["Torres"][identifier][versao]
     end
 
     if not url or url == "" or url:sub(1, 4) ~= "http" then
@@ -438,6 +547,7 @@ local function executarRota(categoria, identifier, versao)
                 if type(dadosSlot) == "table" and dadosSlot[1] and dadosSlot[1].dados then
                     dadosSlot = dadosSlot[1]
                 end
+                cacheRotas[cacheKey] = dadosSlot -- Salva no cache pra próxima
                 iniciarTrajetoHavac(dadosSlot)
             else
                 Library:Notify({Title = "Erro", Description = "JSON malformatado ou inválido.", Duration = 3})
@@ -475,12 +585,13 @@ end
 -- ========================================== --
 -- 🏰 SEÇÕES E ELEMENTOS DE TORRES NA UI
 -- ========================================== --
-local opcoesTorre = {"Lento", "Rápido", "Mais Rápido"}
+local opcoesTorre1 = {"Lento", "Rápido", "Mais Rápido"}
+local opcoesTorre2 = {"Frente", "Direita ->", "Esquerda <-", "Atrâs"} -- <-- CRIADO NOVO ARRAY PARA A TORRE 2
 
 local T1Card = Torres_Page:CreateSection("Torre 1")
 local versaoTorre1 = "Lento"
 
-T1Card:AddDropdown("Versão", opcoesTorre, false, function(v)
+T1Card:AddDropdown("Versão", opcoesTorre1, false, function(v)
     versaoTorre1 = v
 end, { Title = "Selecione a Versão" })
 
@@ -490,34 +601,57 @@ end)
 
 
 local T2Card = Torres_Page:CreateSection("Torre 2")
-local versaoTorre2 = "Lento"
+local versaoTorre2 = "Frente" -- <-- VALOR INICIAL CORRIGIDO PARA BATER COM A TABELA
 
-T2Card:AddDropdown("Versão", opcoesTorre, false, function(v)
+T2Card:AddDropdown("Versão", opcoesTorre2, false, function(v) -- <-- PUXANDO AS OPÇÕES DA TORRE 2
     versaoTorre2 = v
-end, { Title = "Selecione a Versão" })
+end, { Title = "Selecione a Direção" })
 
 T2Card:AddButton("Iniciar Torre 2", function()
     executarRota("Torres", "Torre 2", versaoTorre2)
 end)
+-- ========================================== --
+-- ⚙️ INTERFACE: CONFIGURAÇÕES (NOVA TAB)
+-- ========================================== --
+local C1Card = Config_Page:CreateSection("Geral")
 
--- // PÁGINA: Havac (Automações)
-local Havac_Page = DeltaTab:CreatePage("Automações")
+C1Card:AddToggle("Desativar Dummies (Ir Direto/MoveTo)", false, function(value)
+    configSecurity = value
+end)
+
+C1Card:AddToggle("Mostrar Linhas (Apenas Parkour)", false, function(value)
+    mostrarLinhas = value
+    -- Atualiza visibilidade em tempo real para os Dummies já espalhados
+    if type(dummiesAtivos) == "table" then
+        for _, data in pairs(dummiesAtivos) do
+            if type(data) == "table" and data.linesFolder then
+                for _, part in ipairs(data.linesFolder:GetChildren()) do
+                    if part:IsA("Part") then part.Transparency = value and 0.5 or 1 end
+                end
+            end
+        end
+    end
+end)
+
+C1Card:AddButton("Limpar Dummies e Rotas Pendentes", function()
+    limparDummies()
+    if reproduzindo then
+        pararReproducao()
+    end
+    Library:Notify({Title = "Limpo", Description = "Todos os Dummies e rotas foram cancelados.", Duration = 3})
+end)
 
 -- ========================================== --
 -- 🧠 MOTOR LÓGICO E UI: AUTO JJS (POLICHINELOS)
 -- ========================================== --
-local VIM = game:GetService("VirtualInputManager")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UIS = game:GetService("UserInputService")
-
 local quantidadeMaxima = 0 
-local contadorAtual = 0
 local autoJJSEnabled = false
 local delaySegundos = 0.53
 local keyMap = { Q = Enum.KeyCode.Q, E = Enum.KeyCode.E }
 
 local function dispararTecla(keycode)
     pcall(function()
+        if not VIM then return end
         VIM:SendKeyEvent(true, keycode, false, game)
         task.wait(0.05)
         VIM:SendKeyEvent(false, keycode, false, game)
@@ -531,12 +665,30 @@ local function cliqueVirtualFisico(button)
         firesignal(button.MouseButton1Click)
         firesignal(button.TouchTap)
         button:Activate()
-        local x = button.AbsolutePosition.X + (button.AbsoluteSize.X / 2)
-        local y = button.AbsolutePosition.Y + (button.AbsoluteSize.Y / 2)
-        VIM:SendMouseButtonEvent(x, y, 0, true, game, 1)
-        task.wait(0.05)
-        VIM:SendMouseButtonEvent(x, y, 0, false, game, 1)
+        if VIM then
+            local x = button.AbsolutePosition.X + (button.AbsoluteSize.X / 2)
+            local y = button.AbsolutePosition.Y + (button.AbsoluteSize.Y / 2)
+            VIM:SendMouseButtonEvent(x, y, 0, true, game, 1)
+            task.wait(0.05)
+            VIM:SendMouseButtonEvent(x, y, 0, false, game, 1)
+        end
     end)
+end
+
+local function pegarJJSAtual()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Head") then
+        for _, v in ipairs(char.Head:GetChildren()) do
+            if v:IsA("BillboardGui") and (v.Name:lower():find("poli") or v.Name:lower():find("jjs") or v.Name:lower():find("texto")) then
+                local label = v:FindFirstChildOfClass("TextLabel")
+                if label and label.Text then
+                    local numStr = string.match(label.Text, "%d+")
+                    if numStr then return tonumber(numStr) end
+                end
+            end
+        end
+    end
+    return -1 
 end
 
 local JjsCard = Havac_Page:CreateSection("Auto JJS")
@@ -545,15 +697,23 @@ JjsCard:AddToggle("Ativar Auto JJS", false, function(state)
     autoJJSEnabled = state
     if autoJJSEnabled then
         local metaAlvo = (quantidadeMaxima > 0) and quantidadeMaxima or math.huge
-        contadorAtual = 0
-        Library:Notify({Title = "Auto JJS", Description = "Iniciado. Meta: " .. ((metaAlvo == math.huge) and "Infinito" or tostring(metaAlvo)), Duration = 3})
+        Library:Notify({Title = "Auto JJS", Description = "Iniciado. Lendo valor da cabeça!", Duration = 3})
 
         task.spawn(function()
             local processados = {}
-            while autoJJSEnabled and contadorAtual < metaAlvo do
+            local countProc = 0
+            
+            while autoJJSEnabled do
+                local jjsReal = pegarJJSAtual()
+                
+                if metaAlvo ~= math.huge and jjsReal >= metaAlvo then
+                    autoJJSEnabled = false
+                    Library:Notify({Title = "Concluído", Description = "Você atingiu o limite de " .. metaAlvo .. " JJS!", Duration = 4})
+                    break
+                end
+                
                 pcall(function()
                     local screen = LocalPlayer:FindFirstChild("PlayerGui") and LocalPlayer.PlayerGui:FindFirstChild("Polichinelos") and LocalPlayer.PlayerGui.Polichinelos:FindFirstChild("Screen")
-                    
                     if screen and autoJJSEnabled then
                         for _, botao in ipairs(screen:GetChildren()) do
                             if botao:IsA("ImageButton") and botao.Visible and not processados[botao] then
@@ -561,17 +721,13 @@ JjsCard:AddToggle("Ativar Auto JJS", false, function(state)
                                 if label and label.Text and label.Text ~= "" then
                                     local textoLetra = tostring(label.Text):upper():gsub("%s+", "")
                                     processados[botao] = true
+                                    countProc = countProc + 1
                                     
-                                    if keyMap[textoLetra] then
-                                        dispararTecla(keyMap[textoLetra])
-                                    else
-                                        cliqueVirtualFisico(botao)
-                                    end
+                                    if keyMap[textoLetra] then dispararTecla(keyMap[textoLetra]) else cliqueVirtualFisico(botao) end
                                     
                                     local remote = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Polichinelos")
                                     if remote then remote:FireServer("Add", 1) end
 
-                                    contadorAtual = contadorAtual + 1
                                     task.wait(delaySegundos)
                                     break
                                 end
@@ -580,16 +736,11 @@ JjsCard:AddToggle("Ativar Auto JJS", false, function(state)
                     end
                 end)
                 
-                if typeof(processados) == "table" and #processados > 15 then 
-                    table.clear(processados) 
+                if countProc > 15 then 
+                    table.clear(processados)
+                    countProc = 0 
                 end
-                
                 task.wait(0.1)
-            end
-            
-            if autoJJSEnabled and metaAlvo ~= math.huge and contadorAtual >= metaAlvo then
-                autoJJSEnabled = false
-                Library:Notify({Title = "Concluído", Description = "Atingiu a meta de " .. metaAlvo .. " JJS!", Duration = 3})
             end
         end)
     else
@@ -597,22 +748,18 @@ JjsCard:AddToggle("Ativar Auto JJS", false, function(state)
     end
 end, { Title = "Status do JJS" })
 
-JjsCard:AddTextbox("Quantidade de JJS", "Vazio = Infinito", function(text)
+JjsCard:AddTextbox("Quantidade Limite Exata", "Ex: 308", function(text)
     local num = tonumber(text)
     if num and num > 0 then
         quantidadeMaxima = num
-        Library:Notify({Title = "Configuração", Description = "Limite definido: " .. quantidadeMaxima, Duration = 2})
+        Library:Notify({Title = "Limite Exato", Description = "O robô vai parar ao chegar em " .. num, Duration = 3})
     else
         quantidadeMaxima = 0
-        Library:Notify({Title = "Configuração", Description = "Modo INFINITO ativado!", Duration = 2})
+        Library:Notify({Title = "Configuração", Description = "Modo INFINITO ativado!", Duration = 3})
     end
-end, { Title = "Limite de JJS" })
+end, { Title = "Parar JJS quando atingir:" })
 
-JjsCard:AddSlider("Delay", 53, 200, 53, function(val)
-    if val < 53 then val = 53 end
-    delaySegundos = val / 100
-end, { Title = "Atraso entre cliques (ms)" })
-
+JjsCard:AddSlider("Delay", 53, 200, 53, function(val) delaySegundos = math.max(val, 53) / 100 end, { Title = "Atraso (ms)" })
 -- ========================================== --
 -- 🧠 MOTOR LÓGICO 3: AUTO FARM E MISSÕES (MICRO-TP UNDERGROUND)
 -- ========================================== --
